@@ -1,13 +1,14 @@
 plugins {
-    alias(libs.plugins.agp.app)
+    alias(libs.plugins.agp)
     alias(libs.plugins.kotlin)
+    alias(libs.plugins.composeCompiler)
 }
 
 android {
     defaultConfig {
         applicationId = "com.imashnake.aigo"
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.0.0-alpha01"
     }
 
     buildTypes {
@@ -23,10 +24,7 @@ android {
     buildFeatures {
         compose = true
     }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.10"
-    }
+    composeCompiler.enableStrongSkippingMode = true
 
     packaging {
         resources {
@@ -50,6 +48,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
