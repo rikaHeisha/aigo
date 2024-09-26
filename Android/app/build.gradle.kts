@@ -5,7 +5,7 @@ plugins {
 
 android {
     defaultConfig {
-        applicationId = "com.imashnake.template"
+        applicationId = "com.imashnake.aigo"
         versionCode = 1
         versionName = "1.0"
     }
@@ -34,7 +34,7 @@ android {
         }
     }
 
-    namespace = "com.imashnake.template"
+    namespace = "com.imashnake.aigo"
 }
 
 kotlin {

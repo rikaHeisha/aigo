@@ -1,4 +1,4 @@
-package com.imashnake.template.ui.theme
+package com.imashnake.aigo.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
