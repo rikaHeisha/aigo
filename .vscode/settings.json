@@ -1,0 +1,10 @@
+{
+    // "terminal.integrated.env.linux": {
+    //     "PYTHONPATH": "${workspaceFolder}/research/"
+    // },
+    "files.exclude": {
+        "**/__pycache__": true,
+    },
+    "python.analysis.autoImportCompletions": true
+
+}

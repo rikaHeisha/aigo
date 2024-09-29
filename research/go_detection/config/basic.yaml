@@ -1,0 +1,9 @@
+defaults:
+  - hydra
+  - sim_cfg_default
+  - _self_
+
+data_cfg:
+  base_path: /home/rmenon/Desktop/dev/ml/datasets/pandaset
+
+exp_name: basic

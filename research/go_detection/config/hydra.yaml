@@ -1,0 +1,5 @@
+hydra:
+  job:
+    chdir: False
+  run:
+    dir: /tmp/${now:%Y-%m-%d_%H-%M-%S}
