@@ -5,12 +5,15 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 
+THIS_FOLDER = os.path.dirname(__file__)
+
+
 @dataclass
 class GitInfo:
     current_commit: str
     current_commit_short: str
     branch_name: str
-    repo_clean: str
+    repo_clean: bool
 
 
 def _fetch_git_properties(base_path: str) -> GitInfo:
@@ -52,9 +55,9 @@ def get_git_info(
 
     git_base_path = None
     if not recurse_parents:
-        git_base_path = base_path or os.getcwd()
+        git_base_path = base_path
     else:
-        base_path = Path(base_path)
+        base_path = Path(base_path or THIS_FOLDER)
         parents = [base_path] + list(base_path.parents)
 
         for path in parents:

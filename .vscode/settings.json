@@ -5,6 +5,12 @@
     "files.exclude": {
         "**/__pycache__": true,
     },
-    "python.analysis.autoImportCompletions": true
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.extraPaths": [
+        "./research",
+    ],
+    "python.autoComplete.extraPaths": [
+        "./research",
+    ],
 
 }

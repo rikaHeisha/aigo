@@ -33,7 +33,8 @@ class AssetIO:
 
     def save_yaml(self, rel_path: str, data):
         with open(self._abs(rel_path), mode="w") as fp:
-            fp.write(data)
+            OmegaConf.save(config=data, f=fp.name)
+            # fp.write(data)
 
     def load_yaml(self, rel_path: str):
         return OmegaConf.load(self._abs(rel_path))
