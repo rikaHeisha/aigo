@@ -20,16 +20,12 @@ def main(cfg: SimCfg):
     cfg_yaml = OmegaConf.to_yaml(cfg)
     print(cfg_yaml)
 
+    # Save config info
     exp_io = AssetIO(os.path.join(cfg.exp_dir, cfg.exp_name))
     exp_io.mkdir(".")
     exp_io.save_yaml("config.yaml", cfg)
 
-    if os.environ.get("ENABLE_DEBUGPY"):
-        print("")
-        print("\033[31mWaiting for debugger\033[0m")
-        debugpy.listen(5678)
-        debugpy.wait_for_client()
-
+    # Save git infomation
     git_info = get_git_info()
     run_cmd = f'python {" ".join(sys.argv)}'
     export_cmd = f"{run_cmd} result.export=True"
@@ -43,6 +39,12 @@ def main(cfg: SimCfg):
             "export_command": export_cmd,
         },
     )
+
+    if os.environ.get("ENABLE_DEBUGPY"):
+        print("")
+        print("\033[31mWaiting for debugger\033[0m")
+        debugpy.listen(5678)
+        debugpy.wait_for_client()
 
     do_main(cfg)
 
