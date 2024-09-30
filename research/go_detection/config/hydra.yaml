@@ -1,3 +1,9 @@
+defaults:  
+  - _self_  
+  # - override hydra/hydra_logging: colorlog  
+  # - override hydra/job_logging: colorlog
+  - override hydra/job_logging: custom
+
 hydra:
   job:
     chdir: False

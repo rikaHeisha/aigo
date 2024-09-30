@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from typing import List, Optional
@@ -9,21 +10,48 @@ from config import SimCfg
 from go_detection.common.git_utils import get_git_info
 from go_detection.dataloader import create_datasets
 from hydra.core.config_store import ConfigStore
+from hydra.core.hydra_config import HydraConfig
 from omegaconf import OmegaConf
+
+logger = logging.getLogger(__name__)
 
 
 def do_main(cfg: SimCfg):
-    train_dataloader, test_dataloader = create_datasets(cfg.data_cfg)
+    fh = logging.FileHandler(
+        filename=f"{cfg.result_cfg.dir}/{cfg.result_cfg.exp_name}/log/main.log"
+    )
+    fh.setFormatter(
+        logging.Formatter(fmt="[%(asctime)s][%(name)s][%(levelname)s] - %(message)s")
+    )
+    logging.getLogger().addHandler(fh)
+
+    hydra_dir = HydraConfig.get().run.dir
+    logger.info(f"Hydra dir: {hydra_dir}")
+
+    # Add cli arg hydra.job_logging.root.level=ERROR to set
+    # log_filename = HydraConfig.get().job_logging.handlers["file"].filename
+    # log_level = HydraConfig.get().job_logging.root.level
+    # logger.info(f"Writing output to {log_filename} at level {log_level}")
+
+    logger.debug("debug")
+    logger.info("info")
+    logger.warning("warning")
+    logger.error("error")
+    logger.critical("critical")
+    # train_dataloader, test_dataloader = create_datasets(cfg.data_cfg)
 
 
 @hydra.main(config_path="config", config_name="basic", version_base="1.2")
 def main(cfg: SimCfg):
+    OmegaConf.set_readonly(cfg, True)
+
     cfg_yaml = OmegaConf.to_yaml(cfg)
     print(cfg_yaml)
 
     # Save config info
     exp_io = AssetIO(os.path.join(cfg.result_cfg.dir, cfg.result_cfg.exp_name))
     exp_io.mkdir(".")
+    exp_io.mkdir("log")
     exp_io.save_yaml("config.yaml", cfg)
 
     # Save git infomation

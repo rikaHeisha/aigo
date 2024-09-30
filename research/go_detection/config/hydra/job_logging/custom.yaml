@@ -1,0 +1,63 @@
+# Copied from https://github.com/facebookresearch/hydra/blob/main/plugins/hydra_colorlog/hydra_plugins/hydra_colorlog/conf/hydra/job_logging/colorlog.yaml
+
+# version: 1
+# formatters:
+#   simple:
+#     format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
+#   colorlog:
+#     '()': 'colorlog.ColoredFormatter'
+#     format: '[%(cyan)s%(asctime)s%(reset)s][%(blue)s%(name)s%(reset)s][%(log_color)s%(levelname)s%(reset)s] - %(message)s'
+#     log_colors:
+#       DEBUG: purple
+#       INFO: green
+#       WARNING: yellow
+#       ERROR: red
+#       CRITICAL: red
+# handlers:
+#   console:
+#     class: logging.StreamHandler
+#     formatter: colorlog
+#     stream: ext://sys.stdout
+#   file:
+#     class: logging.FileHandler
+#     formatter: simple
+#     # relative to the job log directory
+#     filename: ${hydra.runtime.output_dir}/${hydra.job.name}.log
+# root:
+#   level: INFO
+#   handlers: [console, file]
+
+# disable_existing_loggers: false
+
+
+version: 1
+formatters:
+  simple:
+    format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
+  colorlog:
+    '()': 'colorlog.ColoredFormatter'
+    format: '[%(cyan)s%(asctime)s%(reset)s][%(blue)s%(name)s%(reset)s][%(log_color)s%(levelname)s%(reset)s] - %(message)s'
+    log_colors:
+      DEBUG: purple
+      INFO: green
+      WARNING: yellow
+      ERROR: red
+      CRITICAL: red
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: colorlog
+    stream: ext://sys.stdout
+  # file:
+  #   class: logging.FileHandler
+  #   formatter: simple
+  #   # relative to the job log directory
+  #   filename: ${hydra.runtime.output_dir}/${hydra.job.name}.log
+  #   # filename: ${hydra.runtime.output_dir}/${now:%Y-%m-%d_%H-%M-%S}.log
+  #   # filename: ${result_cfg.dir}/${result_cfg.exp_name}/log/${now:%Y-%m-%d_%H-%M-%S}.log
+root:
+  level: INFO
+  # handlers: [console, file]
+  handlers: [console]
+
+disable_existing_loggers: false
