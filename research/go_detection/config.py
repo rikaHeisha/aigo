@@ -1,5 +1,8 @@
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional
+
+from go_detection.common.asset_io import AssetIO
 
 
 # Fully qaualified class name can be obtained by: <class>.__module__ + "." + <class>.__qualname__
@@ -12,6 +15,9 @@ class DataCfg:
 
     _target_: str = f"{__module__}.{__qualname__}"
 
+    def get_asset_io(self) -> AssetIO:
+        return AssetIO(self.base_path)
+
 
 @dataclass
 class ResultCfg:
@@ -19,6 +25,9 @@ class ResultCfg:
     dir: str
 
     _target_: str = f"{__module__}.{__qualname__}"
+
+    def get_asset_io(self) -> AssetIO:
+        return AssetIO(os.path.join(self.dir, self.name))
 
 
 @dataclass

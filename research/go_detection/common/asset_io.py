@@ -34,6 +34,9 @@ class AssetIO:
 
         return dirs
 
+    def contains(self, rel_path: str = "") -> bool:
+        return self.is_file(rel_path) or self.is_dir(rel_path)
+
     def is_file(self, rel_path: str = "") -> bool:
         return os.path.isfile(self._abs(rel_path))
 
@@ -47,7 +50,10 @@ class AssetIO:
         )
 
     def load_torch(self, rel_path: str):
-        data = torch.load(self._abs(rel_path))
+        data = torch.load(
+            self._abs(rel_path),
+            weights_only=True,
+        )
         return data
 
     def save_yaml(self, rel_path: str, data):

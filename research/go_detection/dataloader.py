@@ -312,11 +312,13 @@ def _load(entire_data: List[DataPointPath], data_io: AssetIO, include_logs=True)
 class GoDataset(Dataset):
     def __init__(
         self,
-        entire_data: List[DataPointPath],
+        datapoint_paths: List[DataPointPath],
         base_path: str,
     ):
-        data_io = AssetIO(base_path)
-        self.images, self.labels, self.board_pts = _load(entire_data, data_io)
+        self.datapoint_paths = datapoint_paths
+        self.images, self.labels, self.board_pts = _load(
+            datapoint_paths, AssetIO(base_path)
+        )
 
     def __len__(self):
         return len(self.labels)
@@ -327,23 +329,56 @@ class GoDataset(Dataset):
 
 class GoDynamicDataset(Dataset):
     """
-    We cannot load the entire dataset into memory. So load it on the fly
+    We cannot load the entire dataset into memory so load it dynamically
     """
 
     def __init__(
         self,
-        entire_data: List[DataPointPath],
+        datapoint_paths: List[DataPointPath],
         base_path: str,
     ):
+        self.datapoint_paths = datapoint_paths
         self.data_io = AssetIO(base_path)
-        self.entire_data = entire_data
 
     def __len__(self):
-        return len(self.entire_data)
+        return len(self.datapoint_paths)
 
     def __getitem__(self, idx) -> DataPoint:
-        data_point = _load_single(self.entire_data[idx], self.data_io)
+        data_point = _load_single(self.datapoint_paths[idx], self.data_io)
         return data_point
+
+
+def load_datasets(
+    cfg: DataCfg,
+    train_datapoint_paths: List[DataPointPath],
+    test_datapoint_paths: List[DataPointPath],
+):
+    if cfg.use_dynamic_dataset:
+        train_dataset = GoDynamicDataset(train_datapoint_paths, cfg.base_path)
+        test_dataset = GoDynamicDataset(test_datapoint_paths, cfg.base_path)
+    else:
+        train_dataset = GoDataset(train_datapoint_paths, cfg.base_path)
+        test_dataset = GoDataset(test_datapoint_paths, cfg.base_path)
+
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=4,
+        # shuffle=True,
+        sampler=InfiniteSampler(len(train_dataset), True, False),
+        collate_fn=custom_collate_fn,
+        # num_workers=4,
+        # multiprocessing_context="spawn",
+    )
+
+    test_dataloader = DataLoader(
+        test_dataset,
+        batch_size=1,
+        sampler=InfiniteSampler(len(test_dataset), False, False),
+        collate_fn=custom_collate_fn,
+        # num_workers=4,
+        # multiprocessing_context="spawn",
+    )
+    return train_dataloader, test_dataloader
 
 
 def create_datasets(cfg: DataCfg):
@@ -413,37 +448,4 @@ def create_datasets(cfg: DataCfg):
     train = list(itertools.chain(*train))
     test = list(itertools.chain(*test))
 
-    if cfg.use_dynamic_dataset:
-        train_dataset, test_dataset = GoDynamicDataset(
-            train, cfg.base_path
-        ), GoDynamicDataset(test, cfg.base_path)
-    else:
-        train_dataset, test_dataset = GoDataset(train, cfg.base_path), GoDataset(
-            test, cfg.base_path
-        )
-
-    logger.info(
-        f"Loaded datasets: Train: {len(train_dataset)} ({100.0 * len(train_dataset) / (len(train_dataset) + len(test_dataset)) : .1f} %), Test: {len(test_dataset)} ({100.0 * len(test_dataset) / (len(train_dataset) + len(test_dataset)) : .1f} %)"
-    )
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_size=4,
-        # shuffle=True,
-        sampler=InfiniteSampler(len(train_dataset), True, False),
-        collate_fn=custom_collate_fn,
-        # num_workers=4,
-        # multiprocessing_context="spawn",
-    )
-
-    test_dataloader = DataLoader(
-        test_dataset,
-        batch_size=1,
-        sampler=InfiniteSampler(len(test_dataset), False, False),
-        collate_fn=custom_collate_fn,
-        # num_workers=4,
-        # multiprocessing_context="spawn",
-    )
-
-    # for i, data in enumerate(test_dataloader_iter):
-    #     print(f"Test data point: {i}, shape: {data[0].shape}")
-    return train_dataloader, test_dataloader
+    return load_datasets(cfg, train, test)
