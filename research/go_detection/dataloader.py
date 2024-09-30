@@ -21,22 +21,95 @@ DataPoints = namedtuple("DataPoints", ["images", "labels", "board_pts"])
 logger = logging.getLogger(__name__)
 
 
-def _visualize_single_helper(axis, image, label, board_pt):
+def _convert_points(points: torch.Tensor, board_pt: torch.Tensor):
+    """
+    Points is a tensor of (Nx2) points in normalized image coordinates (range [0,1]).
+    The points gets mapped to board_pt using bilinear interpolation. The board_pt contains the corners of the cube on the image
+    Returns:
+        A tensor of shape (Nx2) containing the mapped points (image points)
+    """
+    assert points.min() >= 0.0 and points.max() <= 1.0
+
+    # Perform lerp on the top edge
+    diff_x = board_pt[1] - board_pt[0]
+    points_top = board_pt[0] + points[:, 0].unsqueeze(1) * diff_x
+
+    # Perform lerp on the bottom edge
+    diff_x = board_pt[2] - board_pt[3]
+    points_bottom = board_pt[3] + points[:, 0].unsqueeze(1) * diff_x
+
+    # Perform lerp
+    diff_y = points_bottom - points_top
+    image_points = points_top + points[:, 1].unsqueeze(1) * diff_y
+
+    # # Perform lerp on the left edge
+    # diff_y = board_pt[3] - board_pt[0]
+    # points_left = board_pt[0] + points[:, 1].unsqueeze(1) * diff_y
+
+    # # Perform lerp on the right edge
+    # diff_y = board_pt[2] - board_pt[1]
+    # points_right = board_pt[1] + points[:, 1].unsqueeze(1) * diff_y
+
+    # # Perform lerp
+    # diff_x = points_right - points_left
+    # image_points_2 = points_left + points[:, 0].unsqueeze(1) * diff_x
+
+    return image_points
+
+
+def _visualize_single_helper(
+    axis,
+    image: torch.Tensor,
+    label: torch.Tensor,
+    board_pt: torch.Tensor,
+    viz_corner_points: bool = True,
+    viz_all_points: bool = False,
+):
+    def _get_color(lab):
+        if lab == -1:
+            return "black"
+        elif lab == 0:
+            return "green"
+        else:
+            assert lab == 1
+            return "white"
+
     (_, height, width) = image.shape
     image = image.transpose(0, 1).transpose(1, 2)  # Convert CHW to HWC
     image = image.clamp(0.0, 1.0)
     axis.imshow(image)
 
-    # Get label scatter
-    axis.scatter(
-        (board_pt[:, 0] * width).int(),
-        (board_pt[:, 1] * height).int(),
-        # facecolors="none",
-        # edgecolors=["red", "red", "green", "green"],
-        c=["red", "red", "green", "green"],
-        marker="s",
-        s=200,
-    )
+    # Corner points
+    if viz_corner_points:
+        axis.scatter(
+            (board_pt[:, 0] * width).int(),
+            (board_pt[:, 1] * height).int(),
+            # facecolors="none",
+            # edgecolors=["red", "red", "green", "green"],
+            c="red",
+            marker="s",
+            s=200,
+        )
+
+    if viz_all_points:
+        xs = torch.linspace(0.0, 1.0, steps=label.shape[0])
+        ys = torch.linspace(0.0, 1.0, steps=label.shape[1])
+        meshgrid = torch.meshgrid(xs, ys, indexing="xy")
+        grid_pt = torch.stack(meshgrid, dim=2).reshape(-1, 2)
+        image_points = _convert_points(grid_pt, board_pt)
+
+        colors = [_get_color(l) for l in label.reshape(-1)]
+
+        axis.scatter(
+            (image_points[:, 0] * width).int(),
+            (image_points[:, 1] * height).int(),
+            # facecolors="none",
+            # edgecolors=["red", "red", "green", "green"],
+            c=colors,
+            marker="s",
+            s=100,
+        )
+
     axis.axis("off")
     axis.set_aspect("auto")
 
@@ -58,32 +131,31 @@ def visualize_single_datapoint(data_points: DataPoints, output_path: str, index:
     plt.close(fig)
 
 
-def _get_layout(num_images):
-    known_layouts = [
-        (1, (1, 1)),
-        (2, (2, 1)),
-        (4, (2, 2)),
-        (6, (3, 2)),
-        (8, (2, 4)),
-        (9, (3, 3)),
-        (11, (3, 4)),
-        (12, (3, 4)),
-        (16, (4, 4)),
-    ]
-
-    for idx, layout in known_layouts:
-        if num_images <= idx:
-            return layout
-
-    # Unknown layout. Return something
-    return (num_images, 1)
-
-
 def visualize_datapoints(
     data_point: DataPoints,
     output_path: str,
     max_viz_images: int | None = None,
 ):
+    def _get_layout(num_images: int):
+        known_layouts = [
+            (1, (1, 1)),
+            (2, (2, 1)),
+            (4, (2, 2)),
+            (6, (3, 2)),
+            (8, (2, 4)),
+            (9, (3, 3)),
+            (11, (3, 4)),
+            (12, (3, 4)),
+            (16, (4, 4)),
+        ]
+
+        for idx, layout in known_layouts:
+            if num_images <= idx:
+                return layout
+
+        # Unknown layout. Return something
+        return (num_images, 1)
+
     (num_images, _, height, width) = data_point.images.shape
     if max_viz_images:
         num_images = min(num_images, max_viz_images)
@@ -212,6 +284,7 @@ def _load_single(data_point: DataPointPath, data_io: AssetIO) -> DataPoint:
     label = _read_label(data_io, data_point.label_path)
     image, original_size = _read_image(data_io, data_point.image_path, board_metadata)
     image = image[:3, :, :]  # Remove the alpha channel
+    # board_pt is a list of 4 points. The first point is the top left corner, and then the points are in clockwise order
     board_pt = torch.tensor(board_metadata.pts_clicks) / original_size
 
     return DataPoint(image, label, board_pt)

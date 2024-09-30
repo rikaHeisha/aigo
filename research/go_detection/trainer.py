@@ -39,16 +39,16 @@ class GoTrainer:
         self.model = GoModel(self.cfg.model_cfg)
 
         data_point = next(iter(self.train_dataloader))
-        visualize_datapoints(
-            data_point,
-            "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
-            max_viz_images=2,
-        )
-        # visualize_single_datapoint(
+        # visualize_datapoints(
         #     data_point,
         #     "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
-        #     0,
+        #     max_viz_images=2,
         # )
+        visualize_single_datapoint(
+            data_point,
+            "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
+            0,
+        )
 
     def start(self):
         pass
