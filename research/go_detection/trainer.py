@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from go_detection.common.asset_io import AssetIO
 from go_detection.config import DataCfg, SimCfg
-from go_detection.dataloader import create_datasets
+from go_detection.dataloader import create_datasets, visualize_datapoints
 from go_detection.model import GoModel
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
@@ -33,6 +33,11 @@ class GoTrainer:
         #         )
 
         self.model = GoModel(self.cfg.model_cfg)
+
+        data_point = next(iter(self.train_dataloader))
+        visualize_datapoints(
+            data_point, "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png"
+        )
 
     def start(self):
         pass

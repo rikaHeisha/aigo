@@ -9,14 +9,85 @@ import torch
 import torchvision.transforms as transforms
 from go_detection.common.asset_io import AssetIO
 from go_detection.config import DataCfg
+from matplotlib import pyplot as plt
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset, Sampler
 from tqdm import tqdm
 
 DataPointPath = namedtuple("DataPointPath", ["image_path", "label_path", "board_path"])
-DataPoint = namedtuple("DataPoint", ["image", "label", "board"])
+DataPoint = namedtuple("DataPoint", ["image", "label", "board_pt"])
+DataPoints = namedtuple("DataPoints", ["images", "labels", "board_pts"])
 
 logger = logging.getLogger(__name__)
+
+
+def visualize_single_datapoint(data_point: DataPoint, output_path: str):
+    (_, height, width) = data_point.image.shape
+    fig, ax = plt.subplots()
+    image = data_point.image
+    image = image.transpose(0, 1).transpose(1, 2)  # Convert CHW to HWC
+
+    board_pt = data_point.board_pt
+    ax.imshow(image)
+    ax.scatter(
+        (board_pt[:, 0] * width).int(), (board_pt[:, 1] * height).int(), c="red", s=75
+    )
+    ax.axis("off")
+    # plt.show()
+    plt.savefig(output_path, bbox_inches="tight", pad_inches=0)
+    plt.close(fig)
+
+
+def _get_layout(num_images):
+    known_layouts = [
+        (1, (1, 1)),
+        (2, (2, 1)),
+        (4, (2, 2)),
+        (6, (3, 2)),
+        (8, (4, 2)),
+        (9, (3, 3)),
+        (11, (4, 3)),
+        (12, (4, 3)),
+        (16, (4, 4)),
+    ]
+
+    for idx, layout in known_layouts:
+        if num_images <= idx:
+            return layout
+
+    # Unknown layout. Return something
+    return (num_images, 1)
+
+
+def visualize_datapoints(data_point: DataPoints, output_path: str):
+    (num_images, _, height, width) = data_point.images.shape
+
+    # gridspec_kw={"wspace": 0, "hspace": 0}
+    layout = _get_layout(num_images)
+    fig, ax = plt.subplots(
+        layout[0], layout[1], gridspec_kw={"wspace": 0, "hspace": 0}, figsize=(25, 25)
+    )
+    ax = list(itertools.chain(*ax))
+
+    for i in range(num_images):
+        image = data_point.images[i]
+        image = image.transpose(0, 1).transpose(1, 2)  # Convert CHW to HWC
+
+        board_pt = data_point.board_pts[i]
+        ax[i].imshow(image)
+        ax[i].scatter(
+            (board_pt[:, 0] * width).int(),
+            (board_pt[:, 1] * height).int(),
+            c="red",
+            s=75,
+        )
+
+        ax[i].axis("off")
+        ax[i].set_aspect("auto")
+
+    # plt.show()
+    plt.savefig(output_path, bbox_inches="tight", pad_inches=0)
+    plt.close(fig)
 
 
 class InfiniteSampler(Sampler):
@@ -42,15 +113,15 @@ class InfiniteSampler(Sampler):
                 return
 
 
-def custom_collate_fn(batches):
+def custom_collate_fn(batches) -> DataPoints:
     images = []
     labels = []
     board_pts = []
 
     for batch in batches:
-        images.append(batch[0])
-        labels.append(batch[1])
-        board_pts.append(batch[2])
+        images.append(batch.image)
+        labels.append(batch.label)
+        board_pts.append(batch.board_pt)
 
         assert images[0].shape == batch[0].shape
         assert labels[0].shape == batch[1].shape
@@ -59,7 +130,7 @@ def custom_collate_fn(batches):
     images = torch.stack(images, dim=0)
     labels = torch.stack(labels, dim=0)
     board_pts = torch.stack(board_pts, dim=0)
-    return images, labels, board_pts
+    return DataPoints(images, labels, board_pts)
 
 
 def _read_image(data_io: AssetIO, image_path: str, board_metadata):
@@ -69,7 +140,7 @@ def _read_image(data_io: AssetIO, image_path: str, board_metadata):
         - original (width x height) before resizing
     """
     image_tensor = data_io.load_image(image_path)
-    new_size = (1024, 1024)  # Specify the new size as a tuple
+    new_size = (1024, 1024)  # Specify the new size (height, width)
     resize = transforms.Resize(new_size)
     resized_tensor = resize(image_tensor)
 
