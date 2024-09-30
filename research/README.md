@@ -15,3 +15,18 @@ Run the following command to launch tensorboard:
 ```
 tensorboard --logdir=<experiment_dir>
 ```
+
+## Unit tests
+Unit tests are run using pytest. pytest automatically finds all python files `*_test.py` and execute any function `test_*()` defined in those files. To run all unit tests:
+
+```
+# Run all unit tests
+python go_detection/pytest_wrapper.py
+
+# Show stdout even on success
+python go_detection/pytest_wrapper.py -rP
+
+# Run a specific function
+python go_detection/pytest_wrapper.py -rP -k <function_name>
+
+```

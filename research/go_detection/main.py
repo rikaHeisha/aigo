@@ -28,7 +28,7 @@ def do_main(cfg: SimCfg):
 def main(cfg: SimCfg):
     if os.environ.get("ENABLE_DEBUGPY"):
         print("")
-        print("\033[31mWaiting for debugger\033[0m")
+        print("\033[31mWaiting for debugger to connect\033[0m")
         debugpy.listen(5678)
         debugpy.wait_for_client()
 
