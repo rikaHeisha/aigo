@@ -9,6 +9,8 @@ data_cfg:
   randomize_train_split: True
   use_dynamic_dataset: True
 
+model_cfg: {}
+
 result_cfg:
   dir: /home/rmenon/Desktop/dev/ml_results
   name: basic

@@ -13,6 +13,7 @@ from go_detection.dataloader import create_datasets
 from go_detection.trainer import GoTrainer
 from hydra.core.config_store import ConfigStore
 from hydra.core.hydra_config import HydraConfig
+from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
 logger = logging.getLogger(__name__)
@@ -20,11 +21,19 @@ logger = logging.getLogger(__name__)
 
 def do_main(cfg: SimCfg):
     go_trainer = GoTrainer(cfg)
+    go_trainer.start()
 
 
 @hydra.main(config_path="config", config_name="basic", version_base="1.2")
 def main(cfg: SimCfg):
+    if os.environ.get("ENABLE_DEBUGPY"):
+        print("")
+        print("\033[31mWaiting for debugger\033[0m")
+        debugpy.listen(5678)
+        debugpy.wait_for_client()
+
     OmegaConf.set_readonly(cfg, True)
+    cfg = instantiate(cfg)  # Converts the DictConfig to native python classes
 
     # Save config info
     exp_io = AssetIO(os.path.join(cfg.result_cfg.dir, cfg.result_cfg.name))
@@ -62,13 +71,9 @@ def main(cfg: SimCfg):
     logger.info("Config:\n%s", cfg_yaml)
 
     logger.info("Hydra dir set to: %s", HydraConfig.get().run.dir)
-    logger.info(f"Log level set to: {HydraConfig.get().job_logging.root.level}")
-
-    if os.environ.get("ENABLE_DEBUGPY"):
-        print("")
-        print("\033[31mWaiting for debugger\033[0m")
-        debugpy.listen(5678)
-        debugpy.wait_for_client()
+    logger.info(
+        f"Log Level: {HydraConfig.get().job_logging.root.level}, Log File: {log_file}"
+    )
 
     do_main(cfg)
 
