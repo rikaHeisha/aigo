@@ -14,6 +14,7 @@ class GoTrainer:
         super().__init__()
         self.cfg = cfg
 
+        # TODO(rishi): If we are loading a checkpoint, then load the same datasets again. This is so that we don't mix training and test datasets
         train_dataloader, test_dataloader = create_datasets(cfg.data_cfg)
         results_io = AssetIO(os.path.join(cfg.result_cfg.dir, cfg.result_cfg.name))
         results_io.mkdir("tf")
