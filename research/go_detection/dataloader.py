@@ -1,4 +1,5 @@
 import itertools
+import logging
 import random
 from collections import defaultdict, namedtuple
 from typing import List, Tuple
@@ -13,6 +14,8 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from tqdm import tqdm
 
 DataPoint = namedtuple("DataPoint", ["image_path", "label_path", "board_path"])
+
+logger = logging.getLogger(__name__)
 
 
 class InfiniteSampler(Sampler):
@@ -249,7 +252,7 @@ def create_datasets(cfg: DataCfg):
             test, cfg.base_path
         )
 
-    print(
+    logger.info(
         f"Loaded datasets: Train: {len(train_dataset)} ({100.0 * len(train_dataset) / (len(train_dataset) + len(test_dataset)) : .1f} %), Test: {len(test_dataset)} ({100.0 * len(test_dataset) / (len(train_dataset) + len(test_dataset)) : .1f} %)"
     )
     train_dataloader = DataLoader(

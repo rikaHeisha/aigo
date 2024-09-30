@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from datetime import datetime
 from typing import List, Optional
 
 import debugpy
@@ -17,36 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 def do_main(cfg: SimCfg):
-    fh = logging.FileHandler(
-        filename=f"{cfg.result_cfg.dir}/{cfg.result_cfg.exp_name}/log/main.log"
-    )
-    fh.setFormatter(
-        logging.Formatter(fmt="[%(asctime)s][%(name)s][%(levelname)s] - %(message)s")
-    )
-    logging.getLogger().addHandler(fh)
-
-    hydra_dir = HydraConfig.get().run.dir
-    logger.info(f"Hydra dir: {hydra_dir}")
-
-    # Add cli arg hydra.job_logging.root.level=ERROR to set
-    # log_filename = HydraConfig.get().job_logging.handlers["file"].filename
-    # log_level = HydraConfig.get().job_logging.root.level
-    # logger.info(f"Writing output to {log_filename} at level {log_level}")
-
-    logger.debug("debug")
-    logger.info("info")
-    logger.warning("warning")
-    logger.error("error")
-    logger.critical("critical")
-    # train_dataloader, test_dataloader = create_datasets(cfg.data_cfg)
+    train_dataloader, test_dataloader = create_datasets(cfg.data_cfg)
 
 
 @hydra.main(config_path="config", config_name="basic", version_base="1.2")
 def main(cfg: SimCfg):
     OmegaConf.set_readonly(cfg, True)
-
-    cfg_yaml = OmegaConf.to_yaml(cfg)
-    print(cfg_yaml)
 
     # Save config info
     exp_io = AssetIO(os.path.join(cfg.result_cfg.dir, cfg.result_cfg.exp_name))
@@ -68,6 +45,23 @@ def main(cfg: SimCfg):
             "export_command": export_cmd,
         },
     )
+
+    # Setup file logger manually (after the log folder is created)
+    # Add cli arg hydra.job_logging.root.level=ERROR to set log level
+    str_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_file = f"{cfg.result_cfg.dir}/{cfg.result_cfg.exp_name}/log/{str_now}.log"
+    fh = logging.FileHandler(filename=log_file)
+    fh.setFormatter(
+        logging.Formatter(fmt="[%(asctime)s][%(name)s][%(levelname)s] - %(message)s")
+    )
+    logging.getLogger().addHandler(fh)
+
+    # Print config
+    cfg_yaml = OmegaConf.to_yaml(cfg)
+    logger.info("Config:\n%s", cfg_yaml)
+
+    logger.info("Hydra dir set to: %s", HydraConfig.get().run.dir)
+    logger.info(f"Log level set to: {HydraConfig.get().job_logging.root.level}")
 
     if os.environ.get("ENABLE_DEBUGPY"):
         print("")
