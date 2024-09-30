@@ -12,7 +12,7 @@ class DataCfg:
 
 @dataclass
 class ResultCfg:
-    exp_name: str
+    name: str
     dir: str
 
 

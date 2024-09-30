@@ -10,6 +10,7 @@ from common.asset_io import AssetIO
 from config import SimCfg
 from go_detection.common.git_utils import get_git_info
 from go_detection.dataloader import create_datasets
+from go_detection.trainer import GoTrainer
 from hydra.core.config_store import ConfigStore
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import OmegaConf
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def do_main(cfg: SimCfg):
-    train_dataloader, test_dataloader = create_datasets(cfg.data_cfg)
+    go_trainer = GoTrainer(cfg)
 
 
 @hydra.main(config_path="config", config_name="basic", version_base="1.2")
@@ -26,7 +27,7 @@ def main(cfg: SimCfg):
     OmegaConf.set_readonly(cfg, True)
 
     # Save config info
-    exp_io = AssetIO(os.path.join(cfg.result_cfg.dir, cfg.result_cfg.exp_name))
+    exp_io = AssetIO(os.path.join(cfg.result_cfg.dir, cfg.result_cfg.name))
     exp_io.mkdir(".")
     exp_io.mkdir("log")
     exp_io.save_yaml("config.yaml", cfg)
@@ -49,7 +50,7 @@ def main(cfg: SimCfg):
     # Setup file logger manually (after the log folder is created)
     # Add cli arg hydra.job_logging.root.level=ERROR to set log level
     str_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_file = f"{cfg.result_cfg.dir}/{cfg.result_cfg.exp_name}/log/{str_now}.log"
+    log_file = f"{cfg.result_cfg.dir}/{cfg.result_cfg.name}/log/{str_now}.log"
     fh = logging.FileHandler(filename=log_file)
     fh.setFormatter(
         logging.Formatter(fmt="[%(asctime)s][%(name)s][%(levelname)s] - %(message)s")

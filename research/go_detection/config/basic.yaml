@@ -11,4 +11,4 @@ data_cfg:
 
 result_cfg:
   dir: /home/rmenon/Desktop/dev/ml_results
-  exp_name: basic
+  name: basic

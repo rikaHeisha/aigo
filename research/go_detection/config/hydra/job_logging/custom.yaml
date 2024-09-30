@@ -54,7 +54,7 @@ handlers:
   #   # relative to the job log directory
   #   filename: ${hydra.runtime.output_dir}/${hydra.job.name}.log
   #   # filename: ${hydra.runtime.output_dir}/${now:%Y-%m-%d_%H-%M-%S}.log
-  #   # filename: ${result_cfg.dir}/${result_cfg.exp_name}/log/${now:%Y-%m-%d_%H-%M-%S}.log
+  #   # filename: ${result_cfg.dir}/${result_cfg.name}/log/${now:%Y-%m-%d_%H-%M-%S}.log
 root:
   level: INFO
   # handlers: [console, file]
