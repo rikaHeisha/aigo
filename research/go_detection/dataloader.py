@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from tqdm import tqdm
 
 DataPointPath = namedtuple("DataPointPath", ["image_path", "label_path", "board_path"])
+DataPoint = namedtuple("DataPoint", ["image", "label", "board"])
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ def _read_label(data_io: AssetIO, label_path: str):
         return label
 
 
-def _load_single(data_point: DataPointPath, data_io: AssetIO):
+def _load_single(data_point: DataPointPath, data_io: AssetIO) -> DataPoint:
     board_metadata = data_io.load_yaml(data_point.board_path)
 
     label = _read_label(data_io, data_point.label_path)
@@ -117,7 +118,7 @@ def _load_single(data_point: DataPointPath, data_io: AssetIO):
     image = image[:3, :, :]  # Remove the alpha channel
     board_pt = torch.tensor(board_metadata.pts_clicks) / original_size
 
-    return image, label, board_pt
+    return DataPoint(image, label, board_pt)
 
 
 def _load(entire_data: List[DataPointPath], data_io: AssetIO, include_logs=True):
@@ -151,8 +152,8 @@ class GoDataset(Dataset):
     def __len__(self):
         return len(self.labels)
 
-    def __getitem__(self, idx):
-        return self.images[idx], self.labels[idx], self.board_pts[idx]
+    def __getitem__(self, idx) -> DataPoint:
+        return DataPoint(self.images[idx], self.labels[idx], self.board_pts[idx])
 
 
 class GoDynamicDataset(Dataset):
@@ -171,9 +172,9 @@ class GoDynamicDataset(Dataset):
     def __len__(self):
         return len(self.entire_data)
 
-    def __getitem__(self, idx):
-        images, labels, board_pts = _load_single(self.entire_data[idx], self.data_io)
-        return images, labels, board_pts
+    def __getitem__(self, idx) -> DataPoint:
+        data_point = _load_single(self.entire_data[idx], self.data_io)
+        return data_point
 
 
 def create_datasets(cfg: DataCfg):
