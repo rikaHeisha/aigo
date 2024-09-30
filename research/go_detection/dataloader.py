@@ -21,18 +21,38 @@ DataPoints = namedtuple("DataPoints", ["images", "labels", "board_pts"])
 logger = logging.getLogger(__name__)
 
 
-def visualize_single_datapoint(data_point: DataPoint, output_path: str):
-    (_, height, width) = data_point.image.shape
-    fig, ax = plt.subplots()
-    image = data_point.image
+def _visualize_single_helper(axis, image, label, board_pt):
+    (_, height, width) = image.shape
     image = image.transpose(0, 1).transpose(1, 2)  # Convert CHW to HWC
+    image = image.clamp(0.0, 1.0)
+    axis.imshow(image)
 
-    board_pt = data_point.board_pt
-    ax.imshow(image)
-    ax.scatter(
-        (board_pt[:, 0] * width).int(), (board_pt[:, 1] * height).int(), c="red", s=75
+    # Get label scatter
+    axis.scatter(
+        (board_pt[:, 0] * width).int(),
+        (board_pt[:, 1] * height).int(),
+        # facecolors="none",
+        # edgecolors=["red", "red", "green", "green"],
+        c=["red", "red", "green", "green"],
+        marker="s",
+        s=200,
     )
-    ax.axis("off")
+    axis.axis("off")
+    axis.set_aspect("auto")
+
+
+def visualize_single_datapoint(data_points: DataPoints, output_path: str, index: int):
+    num_images = data_points.images.shape[0]
+    assert index < num_images
+
+    fig, axis = plt.subplots(figsize=(25, 25))
+    _visualize_single_helper(
+        axis,
+        data_points.images[index],
+        data_points.labels[index],
+        data_points.board_pts[index],
+    )
+
     # plt.show()
     plt.savefig(output_path, bbox_inches="tight", pad_inches=0)
     plt.close(fig)
@@ -60,10 +80,11 @@ def _get_layout(num_images):
 
 
 def visualize_datapoints(
-    data_point: DataPoints, output_path: str, max_viz_images: int | None = None
+    data_point: DataPoints,
+    output_path: str,
+    max_viz_images: int | None = None,
 ):
     (num_images, _, height, width) = data_point.images.shape
-
     if max_viz_images:
         num_images = min(num_images, max_viz_images)
 
@@ -72,22 +93,18 @@ def visualize_datapoints(
     fig, axes = plt.subplots(
         layout[0], layout[1], gridspec_kw={"wspace": 0, "hspace": 0}, figsize=(25, 25)
     )
-    axes = list(itertools.chain(*axes))
+    if isinstance(axes, np.ndarray):
+        if axes.ndim == 1:
+            axes = list(axes)
+        else:
+            axes = list(itertools.chain(*axes))
+    else:
+        axes = [axes]
 
     for i in range(num_images):
-        image = data_point.images[i]
-        image = image.transpose(0, 1).transpose(1, 2)  # Convert CHW to HWC
-        image = image.clamp(0.0, 1.0)
-        board_pt = data_point.board_pts[i]
-        axes[i].imshow(image)
-        axes[i].scatter(
-            (board_pt[:, 0] * width).int(),
-            (board_pt[:, 1] * height).int(),
-            c="red",
-            s=75,
+        _visualize_single_helper(
+            axes[i], data_point.images[i], data_point.labels[i], data_point.board_pts[i]
         )
-        axes[i].axis("off")
-        axes[i].set_aspect("auto")
 
     for i in range(num_images, len(axes)):
         axes[i].axis("off")
