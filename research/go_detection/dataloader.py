@@ -16,10 +16,14 @@ DataPoint = namedtuple("DataPoint", ["image_path", "label_path", "board_path"])
 
 
 class InfiniteSampler(Sampler):
-    def __init__(self, length, shuffle):
+    def __init__(self, length: int, shuffle: bool, repeat: bool):
         assert length > 0
         self.length = length
         self.shuffle = shuffle
+        self.repeat = repeat
+
+    def __len__(self):
+        return self.length
 
     def __iter__(self):
         order = list(range(self.length))
@@ -30,11 +34,28 @@ class InfiniteSampler(Sampler):
             for idx in order:
                 yield idx
 
+            if not self.repeat:
+                return
 
-def custom_collate_fn(batch):
-    for b in batch:
-        pass
-    return batch[0]
+
+def custom_collate_fn(batches):
+    images = []
+    labels = []
+    board_pts = []
+
+    for batch in batches:
+        images.append(batch[0])
+        labels.append(batch[1])
+        board_pts.append(batch[2])
+
+        assert images[0].shape == batch[0].shape
+        assert labels[0].shape == batch[1].shape
+        assert board_pts[0].shape == batch[2].shape
+
+    images = torch.stack(images, dim=0)
+    labels = torch.stack(labels, dim=0)
+    board_pts = torch.stack(board_pts, dim=0)
+    return images, labels, board_pts
 
 
 def _read_image(data_io: AssetIO, image_path: str, board_metadata):
@@ -85,9 +106,20 @@ def _read_label(data_io: AssetIO, label_path: str):
         return label
 
 
+def _load_single(data_point: DataPoint, data_io: AssetIO):
+    board_metadata = data_io.load_yaml(data_point.board_path)
+
+    label = _read_label(data_io, data_point.label_path)
+    image, original_size = _read_image(data_io, data_point.image_path, board_metadata)
+    image = image[:3, :, :]  # Remove the alpha channel
+    board_pt = torch.tensor(board_metadata.pts_clicks) / original_size
+
+    return image, label, board_pt
+
+
 def _load(entire_data: List[DataPoint], data_io: AssetIO, include_logs=True):
-    labels = []
     images = []
+    labels = []
     board_pts = []
 
     if include_logs:
@@ -96,17 +128,9 @@ def _load(entire_data: List[DataPoint], data_io: AssetIO, include_logs=True):
         iters = iter(entire_data)
 
     for data_point in iters:
-        board_metadata = data_io.load_yaml(data_point.board_path)
-
-        label = _read_label(data_io, data_point.label_path)
-        image, original_size = _read_image(
-            data_io, data_point.image_path, board_metadata
-        )
-        image = image[:3, :, :]  # Remove the alpha channel
-        board_pt = torch.tensor(board_metadata.pts_clicks) / original_size
-
-        labels.append(label)
+        image, label, board_pt = _load_single(data_point)
         images.append(image)
+        labels.append(label)
         board_pts.append(board_pt)
 
     return images, labels, board_pts
@@ -145,11 +169,8 @@ class GoDynamicDataset(Dataset):
         return len(self.entire_data)
 
     def __getitem__(self, idx):
-        images, labels, board_pts = _load(
-            [self.entire_data[idx]], self.data_io, include_logs=False
-        )
-
-        return images[0], labels[0], board_pts[0]
+        images, labels, board_pts = _load_single(self.entire_data[idx], self.data_io)
+        return images, labels, board_pts
 
 
 def create_datasets(cfg: DataCfg):
@@ -228,18 +249,28 @@ def create_datasets(cfg: DataCfg):
             test, cfg.base_path
         )
 
-    train_dataset = DataLoader(
+    print(
+        f"Loaded datasets: Train: {len(train_dataset)} ({100.0 * len(train_dataset) / (len(train_dataset) + len(test_dataset)) : .1f} %), Test: {len(test_dataset)} ({100.0 * len(test_dataset) / (len(train_dataset) + len(test_dataset)) : .1f} %)"
+    )
+    train_dataloader = DataLoader(
         train_dataset,
         batch_size=4,
         # shuffle=True,
-        sampler=InfiniteSampler(len(train_dataset), True),
+        sampler=InfiniteSampler(len(train_dataset), True, False),
         collate_fn=custom_collate_fn,
-        # num_workers=0,
+        # num_workers=4,
         # multiprocessing_context="spawn",
     )
 
-    train_dataset_iter = iter(train_dataset)
-    data = next(train_dataset_iter)
-    data = next(train_dataset_iter)
+    test_dataloader = DataLoader(
+        test_dataset,
+        batch_size=1,
+        sampler=InfiniteSampler(len(test_dataset), False, False),
+        collate_fn=custom_collate_fn,
+        # num_workers=4,
+        # multiprocessing_context="spawn",
+    )
 
-    return train_dataset, test_dataset
+    # for i, data in enumerate(test_dataloader_iter):
+    #     print(f"Test data point: {i}, shape: {data[0].shape}")
+    return train_dataloader, test_dataloader

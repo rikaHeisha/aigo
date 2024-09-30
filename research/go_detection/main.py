@@ -13,7 +13,7 @@ from omegaconf import OmegaConf
 
 
 def do_main(cfg: SimCfg):
-    datasets = create_datasets(cfg.data_cfg)
+    train_dataloader, test_dataloader = create_datasets(cfg.data_cfg)
 
 
 @hydra.main(config_path="config", config_name="basic", version_base="1.2")
