@@ -1,3 +1,4 @@
+import itertools
 import random
 from collections import defaultdict, namedtuple
 from typing import List, Tuple
@@ -14,86 +15,87 @@ from tqdm import tqdm
 DataPoint = namedtuple("DataPoint", ["image_path", "label_path", "board_path"])
 
 
+def _read_image(data_io: AssetIO, image_path: str, board_metadata):
+    """
+    Returns tuple:
+        - resized image
+        - original (width x height) before resizing
+    """
+    image_tensor = data_io.load_image(image_path)
+    new_size = (1024, 1024)  # Specify the new size as a tuple
+    resize = transforms.Resize(new_size)
+    resized_tensor = resize(image_tensor)
+
+    original_size = torch.tensor([image_tensor.shape[2], image_tensor.shape[1]])
+    return resized_tensor, original_size
+
+
+def _read_label(data_io: AssetIO, label_path: str):
+    """
+    Returns a tensor where:
+        Empty: 0
+        White: +1
+        Black: -1
+    """
+    with open(data_io.get_abs(label_path), "r") as file:
+        lines = file.read()
+        label = []
+        for line in lines.split("\n"):
+            label_line = []
+            for ch in line.split(" "):
+                if ch == ".":
+                    digit = 0
+                elif ch.upper() == "W":
+                    digit = 1
+                elif ch.upper() == "B":
+                    digit = -1
+                else:
+                    assert (
+                        False
+                    ), f"Unknown character: '{ch}' in line '{line}', file: {label_path}"
+                label_line.append(digit)
+            label.append(label_line)
+
+        label = torch.tensor(label)
+        return label
+
+
+def _load(entire_data: List[DataPoint], data_io: AssetIO):
+    labels = []
+    images = []
+    board_pts = []
+
+    for data_point in tqdm(entire_data, desc="Loading dataset"):
+        board_metadata = data_io.load_yaml(data_point.board_path)
+
+        label = _read_label(data_io, data_point.label_path)
+        image, original_size = _read_image(
+            data_io, data_point.image_path, board_metadata
+        )
+        image = image[:3, :, :]  # Remove the alpha channel
+        board_pt = torch.tensor(board_metadata.pts_clicks) / original_size
+
+        labels.append(label)
+        images.append(image)
+        board_pts.append(board_pt)
+
+    return labels, images, board_pts
+
+
 class GoDataset(Dataset):
     def __init__(
         self,
-        entire_data: List[List[DataPoint]],
+        entire_data: List[DataPoint],
         base_path: str,
     ):
         data_io = AssetIO(base_path)
-        self.labels, self.images, self.board_pts = self._load(entire_data, data_io)
-        print(f"Length dataset: {len(self.labels)}")
-
-    def _load(self, entire_data: List[List[DataPoint]], data_io: AssetIO):
-        labels = []
-        images = []
-        board_pts = []
-
-        for list_data_points in tqdm(entire_data, desc="Loading dataset"):
-            # All the data points in list_data have the same board metadata
-            assert len(set([_.board_path for _ in list_data_points])) == 1
-            board_metadata = data_io.load_yaml(list_data_points[0].board_path)
-
-            for data_point in list_data_points:
-                label = self._read_label(data_io, data_point.label_path)
-                image, original_size = self._read_image(
-                    data_io, data_point.image_path, board_metadata
-                )
-                image = image[:3, :, :]  # Remove the alpha channel
-                board_pt = torch.tensor(board_metadata.pts_clicks) / original_size
-
-                labels.append(label)
-                images.append(image)
-                board_pts.append(board_pt)
-
-        return labels, images, board_pts
-
-    def _read_image(self, data_io: AssetIO, image_path: str, board_metadata):
-        """
-        Returns tuple:
-            - resized image
-            - original (width x height) before resizing
-        """
-        image_tensor = data_io.load_image(image_path)
-        new_size = (1024, 1024)  # Specify the new size as a tuple
-        resize = transforms.Resize(new_size)
-        resized_tensor = resize(image_tensor)
-
-        original_size = torch.tensor([image_tensor.shape[2], image_tensor.shape[1]])
-        return resized_tensor, original_size
-
-    def _read_label(self, data_io: AssetIO, label_path: str):
-        """
-        Returns a tensor where:
-            Empty: 0
-            White: +1
-            Black: -1
-        """
-        with open(data_io.get_abs(label_path), "r") as file:
-            lines = file.read()
-            label = []
-            for line in lines.split("\n"):
-                label_line = []
-                for ch in line.split(" "):
-                    if ch == ".":
-                        digit = 0
-                    elif ch.upper() == "W":
-                        digit = 1
-                    elif ch.upper() == "B":
-                        digit = -1
-                    else:
-                        assert False, f"Unknown character: '{ch}' in line '{line}'"
-                    label_line.append(digit)
-                label.append(label_line)
-
-            label = torch.tensor(label)
-            return label
+        self.labels, self.images, self.board_pts = _load(entire_data, data_io)
 
     def __len__(self):
-        pass
+        return len(self.labels)
 
     def __getitem__(self, idx):
-        pass
+        return self.labels[idx], self.images[idx], self.board_pts[idx]
 
 
 def create_datasets(cfg: DataCfg):
@@ -159,6 +161,8 @@ def create_datasets(cfg: DataCfg):
     # )
     # assert len(train) + len(validate) + len(test) == len(entire_data)
 
+    train = list(itertools.chain(*train))
+    test = list(itertools.chain(*test))
     train_dataset, test_dataset = GoDataset(train, cfg.base_path), GoDataset(
         test, cfg.base_path
     )
