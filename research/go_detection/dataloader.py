@@ -13,7 +13,7 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset, Sampler
 from tqdm import tqdm
 
-DataPoint = namedtuple("DataPoint", ["image_path", "label_path", "board_path"])
+DataPointPath = namedtuple("DataPointPath", ["image_path", "label_path", "board_path"])
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ def _read_label(data_io: AssetIO, label_path: str):
         return label
 
 
-def _load_single(data_point: DataPoint, data_io: AssetIO):
+def _load_single(data_point: DataPointPath, data_io: AssetIO):
     board_metadata = data_io.load_yaml(data_point.board_path)
 
     label = _read_label(data_io, data_point.label_path)
@@ -120,7 +120,7 @@ def _load_single(data_point: DataPoint, data_io: AssetIO):
     return image, label, board_pt
 
 
-def _load(entire_data: List[DataPoint], data_io: AssetIO, include_logs=True):
+def _load(entire_data: List[DataPointPath], data_io: AssetIO, include_logs=True):
     images = []
     labels = []
     board_pts = []
@@ -142,7 +142,7 @@ def _load(entire_data: List[DataPoint], data_io: AssetIO, include_logs=True):
 class GoDataset(Dataset):
     def __init__(
         self,
-        entire_data: List[DataPoint],
+        entire_data: List[DataPointPath],
         base_path: str,
     ):
         data_io = AssetIO(base_path)
@@ -162,7 +162,7 @@ class GoDynamicDataset(Dataset):
 
     def __init__(
         self,
-        entire_data: List[DataPoint],
+        entire_data: List[DataPointPath],
         base_path: str,
     ):
         self.data_io = AssetIO(base_path)
@@ -180,7 +180,7 @@ def create_datasets(cfg: DataCfg):
     data_io = AssetIO(cfg.base_path)
     directories = sorted(data_io.ls())
 
-    entire_data: List[List[DataPoint]] = []
+    entire_data: List[List[DataPointPath]] = []
     for directory in directories:
         if not data_io.is_dir(directory):
             continue
@@ -205,10 +205,10 @@ def create_datasets(cfg: DataCfg):
 
             map_name_to_dict[file_split[0]][key] = file_name
 
-        directory_data: List[DataPoint] = []
+        directory_data: List[DataPointPath] = []
         for val in map_name_to_dict.values():
             if "label" in val and "image" in val:
-                data = DataPoint(
+                data = DataPointPath(
                     val["image"],
                     val["label"],
                     board_file,
