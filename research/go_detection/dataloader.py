@@ -21,9 +21,14 @@ class GoDataset(Dataset):
         base_path: str,
     ):
         data_io = AssetIO(base_path)
-        self._load(entire_data, data_io)
+        self.labels, self.images, self.board_pts = self._load(entire_data, data_io)
+        print(f"Length dataset: {len(self.labels)}")
 
     def _load(self, entire_data: List[List[DataPoint]], data_io: AssetIO):
+        labels = []
+        images = []
+        board_pts = []
+
         for list_data_points in tqdm(entire_data, desc="Loading dataset"):
             # All the data points in list_data have the same board metadata
             assert len(set([_.board_path for _ in list_data_points])) == 1
@@ -31,14 +36,31 @@ class GoDataset(Dataset):
 
             for data_point in list_data_points:
                 label = self._read_label(data_io, data_point.label_path)
-                image = self._read_image(data_io, data_point.image_path, board_metadata)
+                image, original_size = self._read_image(
+                    data_io, data_point.image_path, board_metadata
+                )
+                image = image[:3, :, :]  # Remove the alpha channel
+                board_pt = torch.tensor(board_metadata.pts_clicks) / original_size
+
+                labels.append(label)
+                images.append(image)
+                board_pts.append(board_pt)
+
+        return labels, images, board_pts
 
     def _read_image(self, data_io: AssetIO, image_path: str, board_metadata):
+        """
+        Returns tuple:
+            - resized image
+            - original (width x height) before resizing
+        """
         image_tensor = data_io.load_image(image_path)
         new_size = (1024, 1024)  # Specify the new size as a tuple
         resize = transforms.Resize(new_size)
         resized_tensor = resize(image_tensor)
-        return resized_tensor
+
+        original_size = torch.tensor([image_tensor.shape[2], image_tensor.shape[1]])
+        return resized_tensor, original_size
 
     def _read_label(self, data_io: AssetIO, label_path: str):
         """
