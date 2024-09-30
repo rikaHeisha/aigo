@@ -4,12 +4,18 @@ from typing import List, Optional
 
 @dataclass
 class DataCfg:
-    name: str = "PandaScene"
-    base_path: str = ""
+    base_path: str
+    train_split_percent: float = 0.8
+    randomize_train_split: bool = True
+
+
+@dataclass
+class ResultCfg:
+    exp_name: str
+    dir: str
 
 
 @dataclass
 class SimCfg:
     data_cfg: DataCfg
-    exp_name: str
-    exp_dir: str = "/home/rmenon/Desktop/dev/ml_results"
+    result_cfg: ResultCfg

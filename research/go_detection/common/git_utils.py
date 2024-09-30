@@ -1,9 +1,8 @@
-import subprocess
 import os
-from pathlib import Path
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Optional
-
 
 THIS_FOLDER = os.path.dirname(__file__)
 
@@ -20,7 +19,7 @@ def _fetch_git_properties(base_path: str) -> GitInfo:
     assert os.path.isdir(
         os.path.join(base_path, ".git")
     ), f"Did not find .git folder in: {base_path}"
-    print(f"Found git directory at: {base_path}")
+    # print(f"Found git directory at: {base_path}")
 
     # return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
     def _run(cmd):

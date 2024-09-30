@@ -4,6 +4,10 @@ defaults:
   - _self_
 
 data_cfg:
-  base_path: /home/rmenon/Desktop/dev/ml/datasets/pandaset
+  base_path: /home/rmenon/Desktop/dev/datasets/go_board/dataset
+  train_split_percent: 0.8
+  randomize_train_split: True
 
-exp_name: basic
+result_cfg:
+  dir: /home/rmenon/Desktop/dev/ml_results
+  exp_name: basic

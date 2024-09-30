@@ -1,18 +1,19 @@
-import debugpy
 import os
-import hydra
-from hydra.core.config_store import ConfigStore
 import sys
-
 from typing import List, Optional
-from omegaconf import OmegaConf
-from config import SimCfg
+
+import debugpy
+import hydra
 from common.asset_io import AssetIO
+from config import SimCfg
 from go_detection.common.git_utils import get_git_info
+from go_detection.dataloader import create_datasets
+from hydra.core.config_store import ConfigStore
+from omegaconf import OmegaConf
 
 
 def do_main(cfg: SimCfg):
-    a = 1
+    datasets = create_datasets(cfg.data_cfg)
 
 
 @hydra.main(config_path="config", config_name="basic", version_base="1.2")
@@ -21,7 +22,7 @@ def main(cfg: SimCfg):
     print(cfg_yaml)
 
     # Save config info
-    exp_io = AssetIO(os.path.join(cfg.exp_dir, cfg.exp_name))
+    exp_io = AssetIO(os.path.join(cfg.result_cfg.dir, cfg.result_cfg.exp_name))
     exp_io.mkdir(".")
     exp_io.save_yaml("config.yaml", cfg)
 
