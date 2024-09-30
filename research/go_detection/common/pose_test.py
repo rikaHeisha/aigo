@@ -1,6 +1,7 @@
-from common.pose import Pose3d
-import torch
 from math import pi
+
+import torch
+from common.pose import Pose3d
 
 
 def test_translation():
