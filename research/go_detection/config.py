@@ -7,6 +7,7 @@ class DataCfg:
     base_path: str
     train_split_percent: float = 0.8
     randomize_train_split: bool = True
+    use_dynamic_dataset: bool = True
 
 
 @dataclass

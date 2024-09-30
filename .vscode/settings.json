@@ -21,5 +21,7 @@
         },
     },
     "isort.args":["--profile", "black"],
+    "editor.wordWrap":"on",
+    "workbench.editor.wrapTabs":true
 
 }

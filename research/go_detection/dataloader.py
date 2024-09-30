@@ -9,10 +9,32 @@ import torchvision.transforms as transforms
 from go_detection.common.asset_io import AssetIO
 from go_detection.config import DataCfg
 from PIL import Image
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Sampler
 from tqdm import tqdm
 
 DataPoint = namedtuple("DataPoint", ["image_path", "label_path", "board_path"])
+
+
+class InfiniteSampler(Sampler):
+    def __init__(self, length, shuffle):
+        assert length > 0
+        self.length = length
+        self.shuffle = shuffle
+
+    def __iter__(self):
+        order = list(range(self.length))
+        while True:
+            if self.shuffle:
+                random.shuffle(order)
+
+            for idx in order:
+                yield idx
+
+
+def custom_collate_fn(batch):
+    for b in batch:
+        pass
+    return batch[0]
 
 
 def _read_image(data_io: AssetIO, image_path: str, board_metadata):
@@ -41,6 +63,9 @@ def _read_label(data_io: AssetIO, label_path: str):
         lines = file.read()
         label = []
         for line in lines.split("\n"):
+            if line == "":
+                continue
+
             label_line = []
             for ch in line.split(" "):
                 if ch == ".":
@@ -60,12 +85,17 @@ def _read_label(data_io: AssetIO, label_path: str):
         return label
 
 
-def _load(entire_data: List[DataPoint], data_io: AssetIO):
+def _load(entire_data: List[DataPoint], data_io: AssetIO, include_logs=True):
     labels = []
     images = []
     board_pts = []
 
-    for data_point in tqdm(entire_data, desc="Loading dataset"):
+    if include_logs:
+        iters = tqdm(entire_data, desc="Loading dataset")
+    else:
+        iters = iter(entire_data)
+
+    for data_point in iters:
         board_metadata = data_io.load_yaml(data_point.board_path)
 
         label = _read_label(data_io, data_point.label_path)
@@ -79,7 +109,7 @@ def _load(entire_data: List[DataPoint], data_io: AssetIO):
         images.append(image)
         board_pts.append(board_pt)
 
-    return labels, images, board_pts
+    return images, labels, board_pts
 
 
 class GoDataset(Dataset):
@@ -89,13 +119,37 @@ class GoDataset(Dataset):
         base_path: str,
     ):
         data_io = AssetIO(base_path)
-        self.labels, self.images, self.board_pts = _load(entire_data, data_io)
+        self.images, self.labels, self.board_pts = _load(entire_data, data_io)
 
     def __len__(self):
         return len(self.labels)
 
     def __getitem__(self, idx):
-        return self.labels[idx], self.images[idx], self.board_pts[idx]
+        return self.images[idx], self.labels[idx], self.board_pts[idx]
+
+
+class GoDynamicDataset(Dataset):
+    """
+    We cannot load the entire dataset into memory. So load it on the fly
+    """
+
+    def __init__(
+        self,
+        entire_data: List[DataPoint],
+        base_path: str,
+    ):
+        self.data_io = AssetIO(base_path)
+        self.entire_data = entire_data
+
+    def __len__(self):
+        return len(self.entire_data)
+
+    def __getitem__(self, idx):
+        images, labels, board_pts = _load(
+            [self.entire_data[idx]], self.data_io, include_logs=False
+        )
+
+        return images[0], labels[0], board_pts[0]
 
 
 def create_datasets(cfg: DataCfg):
@@ -148,6 +202,7 @@ def create_datasets(cfg: DataCfg):
     directory_cumsum = np.cumsum(directory_counts)
     directory_cumsum = directory_cumsum / directory_cumsum[-1]
 
+    # Split the train and test dataset based on the directorys. This is done because one directory has the same board and background. So we don't want images to spill from train dataset to test dataset
     split_index = np.searchsorted(directory_cumsum, cfg.train_split_percent, "right")
     train, test = entire_data[:split_index], entire_data[split_index:]
     assert len(train) + len(test) == len(entire_data)
@@ -163,8 +218,28 @@ def create_datasets(cfg: DataCfg):
 
     train = list(itertools.chain(*train))
     test = list(itertools.chain(*test))
-    train_dataset, test_dataset = GoDataset(train, cfg.base_path), GoDataset(
-        test, cfg.base_path
+
+    if cfg.use_dynamic_dataset:
+        train_dataset, test_dataset = GoDynamicDataset(
+            train, cfg.base_path
+        ), GoDynamicDataset(test, cfg.base_path)
+    else:
+        train_dataset, test_dataset = GoDataset(train, cfg.base_path), GoDataset(
+            test, cfg.base_path
+        )
+
+    train_dataset = DataLoader(
+        train_dataset,
+        batch_size=4,
+        # shuffle=True,
+        sampler=InfiniteSampler(len(train_dataset), True),
+        collate_fn=custom_collate_fn,
+        # num_workers=0,
+        # multiprocessing_context="spawn",
     )
+
+    train_dataset_iter = iter(train_dataset)
+    data = next(train_dataset_iter)
+    data = next(train_dataset_iter)
 
     return train_dataset, test_dataset

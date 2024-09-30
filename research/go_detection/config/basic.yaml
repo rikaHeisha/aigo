@@ -7,6 +7,7 @@ data_cfg:
   base_path: /home/rmenon/Desktop/dev/datasets/go_board/dataset
   train_split_percent: 0.8
   randomize_train_split: True
+  use_dynamic_dataset: True
 
 result_cfg:
   dir: /home/rmenon/Desktop/dev/ml_results
