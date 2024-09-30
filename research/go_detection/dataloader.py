@@ -44,10 +44,10 @@ def _get_layout(num_images):
         (2, (2, 1)),
         (4, (2, 2)),
         (6, (3, 2)),
-        (8, (4, 2)),
+        (8, (2, 4)),
         (9, (3, 3)),
-        (11, (4, 3)),
-        (12, (4, 3)),
+        (11, (3, 4)),
+        (12, (3, 4)),
         (16, (4, 4)),
     ]
 
@@ -59,31 +59,39 @@ def _get_layout(num_images):
     return (num_images, 1)
 
 
-def visualize_datapoints(data_point: DataPoints, output_path: str):
+def visualize_datapoints(
+    data_point: DataPoints, output_path: str, max_viz_images: int | None = None
+):
     (num_images, _, height, width) = data_point.images.shape
+
+    if max_viz_images:
+        num_images = min(num_images, max_viz_images)
 
     # gridspec_kw={"wspace": 0, "hspace": 0}
     layout = _get_layout(num_images)
-    fig, ax = plt.subplots(
+    fig, axes = plt.subplots(
         layout[0], layout[1], gridspec_kw={"wspace": 0, "hspace": 0}, figsize=(25, 25)
     )
-    ax = list(itertools.chain(*ax))
+    axes = list(itertools.chain(*axes))
 
     for i in range(num_images):
         image = data_point.images[i]
         image = image.transpose(0, 1).transpose(1, 2)  # Convert CHW to HWC
-
+        image = image.clamp(0.0, 1.0)
         board_pt = data_point.board_pts[i]
-        ax[i].imshow(image)
-        ax[i].scatter(
+        axes[i].imshow(image)
+        axes[i].scatter(
             (board_pt[:, 0] * width).int(),
             (board_pt[:, 1] * height).int(),
             c="red",
             s=75,
         )
+        axes[i].axis("off")
+        axes[i].set_aspect("auto")
 
-        ax[i].axis("off")
-        ax[i].set_aspect("auto")
+    for i in range(num_images, len(axes)):
+        axes[i].axis("off")
+        axes[i].set_aspect("auto")
 
     # plt.show()
     plt.savefig(output_path, bbox_inches="tight", pad_inches=0)
