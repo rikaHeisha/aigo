@@ -65,13 +65,14 @@ def _visualize_single_helper(
     viz_corner_points: bool = True,
     viz_all_points: bool = False,
 ):
-    def _get_color(lab):
-        if lab == -1:
+    def _label_to_color(lab):
+        assert lab.shape == (3,)
+        if lab[0] == 1:
             return "black"
-        elif lab == 0:
+        elif lab[1] == 1:
             return "green"
         else:
-            assert lab == 1
+            assert lab[2] == 1
             return "white"
 
     (_, height, width) = image.shape
@@ -98,7 +99,7 @@ def _visualize_single_helper(
         grid_pt = torch.stack(meshgrid, dim=2).reshape(-1, 2)
         image_points = _convert_points(grid_pt, board_pt)
 
-        colors = [_get_color(l) for l in label.reshape(-1)]
+        colors = [_label_to_color(l) for l in label.reshape(-1, 3)]
 
         axis.scatter(
             (image_points[:, 0] * width).int(),
@@ -247,10 +248,13 @@ def _read_image(data_io: AssetIO, image_path: str, board_metadata):
 
 def _read_label(data_io: AssetIO, label_path: str):
     """
-    Returns a tensor where:
-        Empty: 0
-        White: +1
-        Black: -1
+    Probability distribution of each node is given by: [black, empty, white]
+    Eg:
+        Empty: [0, 1, 0]
+        White: [0, 0, 1]
+        Black: [1, 0, 0]
+    Returns
+        A tensor of Boardsize x Boardsize x 3
     """
     with open(data_io.get_abs(label_path), "r") as file:
         lines = file.read()
@@ -262,11 +266,11 @@ def _read_label(data_io: AssetIO, label_path: str):
             label_line = []
             for ch in line.split(" "):
                 if ch == ".":
-                    digit = 0
+                    digit = [0, 1, 0]
                 elif ch.upper() == "W":
-                    digit = 1
+                    digit = [0, 0, 1]
                 elif ch.upper() == "B":
-                    digit = -1
+                    digit = [1, 0, 0]
                 else:
                     assert (
                         False
