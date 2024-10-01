@@ -10,5 +10,5 @@ class GoModel(nn.Module):
         self.cfg = cfg
         self.weight = nn.Parameter(torch.tensor([2.0]))
 
-    def forward(self, datapoints):
-        pass
+    def forward(self, images):
+        a = 1

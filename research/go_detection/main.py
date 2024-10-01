@@ -44,7 +44,6 @@ def main(cfg: SimCfg):
     # Save git infomation
     git_info = get_git_info()
     run_cmd = f'python {" ".join(sys.argv)}'
-    export_cmd = f"{run_cmd} result.export=True"
     exp_io.save_yaml(
         "branch_info.yaml",
         {
@@ -52,7 +51,7 @@ def main(cfg: SimCfg):
             "current_commit": git_info.current_commit,
             "repo_clean": "clean" if git_info.repo_clean else "modified",
             "run_command": run_cmd,
-            "export_command": export_cmd,
+            # "export_command": f"{run_cmd} result_cfg.export=True",
         },
     )
 

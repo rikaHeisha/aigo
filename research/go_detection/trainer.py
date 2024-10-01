@@ -8,6 +8,7 @@ from go_detection.common.asset_io import AssetIO
 from go_detection.config import DataCfg, SimCfg
 from go_detection.dataloader import (
     DataPointPath,
+    DataPoints,
     create_datasets,
     load_datasets,
     visualize_datapoints,
@@ -135,8 +136,12 @@ class GoTrainer:
     def step(self):
 
         # Iterate through all the training datasets
-        for datapoints in self.train_dataloader:
-            output = self.model(datapoints)
+        for idx, datapoints in enumerate(self.train_dataloader):
+            datapoints = cast(DataPoints, datapoints)
+            output = self.model(datapoints.images)
+
+            # Use print so this does not end up in the logs
+            print(f"Step: [{self.iter}-{idx}) out of {self.cfg.iters}]")
 
             self.optimizer.zero_grad()
             # loss.backward()
