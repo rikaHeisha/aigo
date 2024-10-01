@@ -40,6 +40,11 @@ class GoTrainer:
         self.train_dataloader, self.test_dataloader = self._load_or_create_dataloader()
         self.load_checkpoint()
 
+        # Create losses
+        self.nll_loss = nn.NLLLoss()
+
+        self.model = self.model.cuda()
+
         # for i in range(400):
         #     self.tf_writer.add_scalar(
         #         "loss/mse", 1.0 * np.sin(i / 100.0 * 8 * np.pi), i
@@ -136,19 +141,43 @@ class GoTrainer:
     def step(self):
 
         # Iterate through all the training datasets
+        loss_map = {}
         for idx, datapoints in enumerate(self.train_dataloader):
-            datapoints = cast(DataPoints, datapoints)
+            loss_map = {}
+
+            datapoints = DataPoints(
+                datapoints[0].cuda(),
+                datapoints[1].cuda(),
+                datapoints[2].cuda(),
+            )
             output = self.model(datapoints.images)
 
+            # assert datapoints.labels.max() < output.shape[1] and datapoints.labels.min() >= 0
+            nll_loss = self.nll_loss(output, datapoints.labels)
+            loss_map["loss_nll"] = (nll_loss, 100.0)
+
             # Use print so this does not end up in the logs
-            print(f"Step: [{self.iter}-{idx}) out of {self.cfg.iters}]")
+            total_loss = torch.tensor(0.0).cuda()
+            for key, value in loss_map.items():
+                if "loss" in key:
+                    total_loss = total_loss + value[0] * value[1]
+
+            loss_map["loss_total"] = (total_loss, 1.0)
+
+            memory_gb = torch.cuda.max_memory_allocated() / 1024**3
+
+            print(
+                f"Exp: {self.cfg.result_cfg.name} Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {memory_gb}, total_loss: {total_loss:.4f}"
+            )
 
             self.optimizer.zero_grad()
-            # loss.backward()
+            total_loss.backward()
             self.optimizer.step()
 
         if self.iter % self.cfg.i_print:
-            logger.info(f"Iter [{self.iter}/{self.cfg.iters}]: ")
+            logger.info(
+                f"Iter: [{self.iter} out of {self.cfg.iters}] - total_loss: {total_loss:.4f}"
+            )
 
         if self.iter % self.cfg.i_tf_writer:
             pass
