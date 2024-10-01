@@ -12,6 +12,8 @@ class DataCfg:
     train_split_percent: float = 0.8
     randomize_train_split: bool = True
     use_dynamic_dataset: bool = True
+    train_batch_size: int = 4
+    test_batch_size: int = 1
 
     _target_: str = f"{__module__}.{__qualname__}"
 
@@ -37,6 +39,12 @@ class ModelCfg:
 
 @dataclass
 class SimCfg:
+    iters: int
+    i_eval: int
+    i_weight: int
+    i_tf_writer: int
+    i_print: int
+
     data_cfg: DataCfg
     model_cfg: ModelCfg
     result_cfg: ResultCfg

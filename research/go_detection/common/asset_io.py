@@ -34,13 +34,13 @@ class AssetIO:
 
         return dirs
 
-    def contains(self, rel_path: str = "") -> bool:
-        return self.is_file(rel_path) or self.is_dir(rel_path)
+    def has(self, rel_path: str = "") -> bool:
+        return self.has_file(rel_path) or self.has_dir(rel_path)
 
-    def is_file(self, rel_path: str = "") -> bool:
+    def has_file(self, rel_path: str = "") -> bool:
         return os.path.isfile(self._abs(rel_path))
 
-    def is_dir(self, rel_path: str = "") -> bool:
+    def has_dir(self, rel_path: str = "") -> bool:
         return os.path.isdir(self._abs(rel_path))
 
     def save_torch(self, rel_path: str, data):

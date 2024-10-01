@@ -362,7 +362,7 @@ def load_datasets(
 
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=4,
+        batch_size=cfg.train_batch_size,
         # shuffle=True,
         sampler=InfiniteSampler(len(train_dataset), True, False),
         collate_fn=custom_collate_fn,
@@ -372,7 +372,7 @@ def load_datasets(
 
     test_dataloader = DataLoader(
         test_dataset,
-        batch_size=1,
+        batch_size=cfg.test_batch_size,
         sampler=InfiniteSampler(len(test_dataset), False, False),
         collate_fn=custom_collate_fn,
         # num_workers=4,
@@ -387,7 +387,7 @@ def create_datasets(cfg: DataCfg):
 
     entire_data: List[List[DataPointPath]] = []
     for directory in directories:
-        if not data_io.is_dir(directory):
+        if not data_io.has_dir(directory):
             continue
 
         files = data_io.ls(directory, only_file_name=False)
