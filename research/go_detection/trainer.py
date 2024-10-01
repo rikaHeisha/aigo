@@ -167,7 +167,7 @@ class GoTrainer:
             memory_gb = torch.cuda.max_memory_allocated() / 1024**3
 
             print(
-                f"Exp: {self.cfg.result_cfg.name} Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {memory_gb}, total_loss: {total_loss:.4f}"
+                f"Exp: {self.cfg.result_cfg.name} Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {memory_gb: .2f} GB, total_loss: {total_loss:.4f}"
             )
 
             self.optimizer.zero_grad()
