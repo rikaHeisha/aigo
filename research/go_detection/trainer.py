@@ -46,7 +46,7 @@ class GoTrainer:
         # Create the model and optimizer
         self.iter = 1
         self.model = GoModel(self.cfg.model_cfg)
-        self.optimizer = torch.optim.SGD(self.get_parameters(), lr=1e-6)
+        self.optimizer = torch.optim.Adam(self.get_parameters(), lr=1e-4)
 
         # Create the dataloader and load checkpoint
         self.train_dataloader, self.test_dataloader = self._load_or_create_dataloader()
@@ -176,8 +176,13 @@ class GoTrainer:
             output = self.model(datapoints.images)
 
             # assert datapoints.labels.max() < output.shape[1] and datapoints.labels.min() >= 0
-            nll_loss = self.nll_loss(output, datapoints.labels)
+            # nll_loss = self.nll_loss(output, datapoints.labels)
             # nll_loss = self.nll_loss(output[0, :, 0, 0], datapoints.labels[0, 0, 0])
+
+            target_label = datapoints.labels[:, 0, 0]
+            target_label = torch.nn.functional.one_hot(target_label, output.shape[1])
+            nll_loss = torch.square(output - target_label).mean()
+
             output_map["nll_loss"] = (nll_loss, 100.0)
 
             # Use print so this does not end up in the logs
