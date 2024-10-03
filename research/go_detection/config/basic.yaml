@@ -20,5 +20,5 @@ data_cfg:
 model_cfg: {}
 
 result_cfg:
-  dir: /home/rmenon/Desktop/dev/ml_results/aigo
+  dir: /home/rmenon/Desktop/dev/ml_results/aigo_results
   name: basic
