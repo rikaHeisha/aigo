@@ -13,7 +13,7 @@ source tools/setup.sh
 ##  Tensorboad
 Run the following command to launch tensorboard:
 ```
-tensorboard --logdir=<experiment_dir>
+tensorboard --logdir=/home/rmenon/Desktop/dev/ml_results
 ```
 
 ## Unit tests

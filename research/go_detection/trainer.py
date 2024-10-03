@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import cast
+from typing import Dict, Tuple, TypeVar, Union, cast
 
 import numpy as np
 import torch
@@ -19,6 +19,9 @@ from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 logger = logging.getLogger(__name__)
+
+MetricPrimitive = Union[float, torch.Tensor, int]
+MetricValue = Union[MetricPrimitive, Tuple[MetricPrimitive, float]]
 
 
 class GoTrainer:
@@ -138,12 +141,30 @@ class GoTrainer:
 
             self.iter += 1
 
+    def _upload_metrics_to_tf(
+        self,
+        step,
+        map_metrics: Dict[str, MetricValue],
+        prefix: str = "",
+    ):
+        for key, metric in map_metrics.items():
+            metric_name = f"{prefix}_{key}"
+
+            if isinstance(metric, MetricPrimitive):
+                self.tf_writer.add_scalar(metric_name, metric, step)
+            else:
+                assert isinstance(metric, tuple)
+                self.tf_writer.add_scalar(metric_name, metric[0], step)
+                self.tf_writer.add_scalar(
+                    f"{metric_name}_weighted", metric[0] * metric[1], step
+                )
+
     def step(self):
 
         # Iterate through all the training datasets
-        loss_map = {}
-        for idx, datapoints in enumerate(self.train_dataloader):
-            loss_map = {}
+        output_map = {}
+        for idx, datapoints in enumerate(self.train_dataloader, 1):
+            output_map: Dict[str, MetricValue] = {}
 
             datapoints = DataPoints(
                 datapoints[0].cuda(),
@@ -154,21 +175,26 @@ class GoTrainer:
 
             # assert datapoints.labels.max() < output.shape[1] and datapoints.labels.min() >= 0
             nll_loss = self.nll_loss(output, datapoints.labels)
-            loss_map["loss_nll"] = (nll_loss, 100.0)
+            output_map["nll_loss"] = (nll_loss, 100.0)
 
             # Use print so this does not end up in the logs
             total_loss = torch.tensor(0.0).cuda()
-            for key, value in loss_map.items():
+            for key, value in output_map.items():
                 if "loss" in key:
+                    assert isinstance(value, tuple)
                     total_loss = total_loss + value[0] * value[1]
 
-            loss_map["loss_total"] = (total_loss, 1.0)
+            output_map["total_loss"] = total_loss
 
             memory_gb = torch.cuda.max_memory_allocated() / 1024**3
+            output_map["memory"] = memory_gb
 
             print(
                 f"Exp: {self.cfg.result_cfg.name} Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {memory_gb: .2f} GB, total_loss: {total_loss:.4f}"
             )
+
+            mini_batch_idx = (self.iter - 1) * len(self.train_dataloader) + idx
+            self._upload_metrics_to_tf(mini_batch_idx, output_map, "mini_batch")
 
             self.optimizer.zero_grad()
             total_loss.backward()
@@ -180,7 +206,7 @@ class GoTrainer:
             )
 
         if self.iter % self.cfg.i_tf_writer:
-            pass
+            self._upload_metrics_to_tf(mini_batch_idx, self.iter, "")
 
         if self.iter % self.cfg.i_eval:
             pass
