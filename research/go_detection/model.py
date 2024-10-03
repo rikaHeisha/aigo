@@ -44,9 +44,11 @@ class GoModel(nn.Module):
         self.stage7 = nn.Sequential(
             nn.Conv2d(cs[4], cs[4], kernel_size=3, padding=0, stride=1),
             nn.MaxPool2d(kernel_size=2),
+            nn.ReLU(inplace=True),
         )
-        self.stage8 = nn.Sequential(
-            nn.Linear(cs[-1] * 6 * 6, 3),
+        self.head = nn.Sequential(
+            # nn.Linear(cs[-1] * 6 * 6, 3),
+            nn.Conv2d(cs[-1], 19 * 19 * 3, kernel_size=6, padding=0, stride=1),
         )
 
         # self.head = nn.Sequential(
@@ -55,9 +57,11 @@ class GoModel(nn.Module):
         #     nn.Conv2d(16, 3, kernel_size=1, padding=0, stride=1),
         # )
 
-        self.log_softmax = nn.LogSoftmax(dim=1)
+        self.log_softmax = nn.LogSoftmax(dim=2)
 
     def forward(self, images):
+        num_images = images.shape[0]
+
         x0 = images
         x1 = self.stage1(x0)
         x2 = self.stage2(x1)
@@ -67,9 +71,12 @@ class GoModel(nn.Module):
 
         x6 = self.stage6(x5)
         x7 = self.stage7(x6)
-        x8 = self.stage8(x7.reshape(x7.shape[0], -1))
+        # x8 = self.head(x7.reshape(x7.shape[0], -1))
+        x8 = self.head(x7)
+        x9 = x8.reshape(num_images, 3, 19 * 19)
+
         # x_out = torch.softmax(x8, dim=1)
-        x_out = self.log_softmax(x8)
+        x_out = self.log_softmax(x9)
 
         # x6 = x5[:, :, :19, :19]
         # x7 = self.head(x6)

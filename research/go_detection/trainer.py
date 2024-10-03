@@ -131,11 +131,11 @@ class GoTrainer:
     def start(self):
         logging.info("Starting training")
 
-        while self.iter < self.cfg.iters:
+        while self.iter <= self.cfg.iters:
             self.step()
 
-            if self.iter % self.cfg.i_weight:
-                pass
+            if self.iter % self.cfg.i_weight == 0:
+                logger.info("Starting evaluation")
 
             self.iter += 1
 
@@ -161,12 +161,17 @@ class GoTrainer:
                     f"{metric_name}_weighted", metric[0] * metric[1], step, metric_time
                 )
 
+        # TODO(rishi): See if this is necessary or not
+        self.tf_writer.flush()
+
     def step(self):
 
         # Iterate through all the training datasets
         output_map = {}
         for idx, datapoints in enumerate(self.train_dataloader, 1):
             output_map: Dict[str, MetricValue] = {}
+
+            num_images = datapoints.images.shape[0]
 
             datapoints = DataPoints(
                 datapoints[0].cuda(),
@@ -180,10 +185,15 @@ class GoTrainer:
             # nll_loss = self.nll_loss(output[0, :, 0, 0], datapoints.labels[0, 0, 0])
 
             # rishi this is for debugging only
-            target_label = datapoints.labels[:, 0, 0]
-            # target_label = torch.nn.functional.one_hot(target_label, output.shape[1])
-            # nll_loss = torch.square(output - target_label).mean()
+            target_label = datapoints.labels.reshape(num_images, -1)
             nll_loss = self.nll_loss(output, target_label)
+
+            # Manuall calculate the NLL loss
+            # target_label_2 = torch.nn.functional.one_hot(datapoints.labels.reshape(num_images, -1), output.shape[1])
+            # nll_loss = (-output.transpose(1,2) * target_label_2).sum(dim=-1).mean()
+
+            # MSE loss
+            # nll_loss = torch.square(output - target_label_2).mean()
 
             output_map["nll_loss"] = (nll_loss, 100.0)
 
@@ -200,24 +210,24 @@ class GoTrainer:
             output_map["memory"] = memory_gb
 
             print(
-                f"Exp: {self.cfg.result_cfg.name} Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {memory_gb: .2f} GB, total_loss: {total_loss:.4f}"
+                f"Exp: {self.cfg.result_cfg.name}, Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {memory_gb: .2f} GB, total_loss: {total_loss:.4f}"
             )
 
             mini_batch_idx = (self.iter - 1) * len(self.train_dataloader) + idx
-            self._upload_metrics_to_tf(mini_batch_idx, output_map, "mini_batch")
+            self._upload_metrics_to_tf(mini_batch_idx, output_map, "batch_")
 
             self.optimizer.zero_grad()
             total_loss.backward()
             self.optimizer.step()
 
-        if self.iter % self.cfg.i_print:
+        if self.iter % self.cfg.i_print == 0:
             logger.info(
-                f"Iter: [{self.iter} out of {self.cfg.iters}] - total_loss: {total_loss:.4f}"
+                f"Exp: {self.cfg.result_cfg.name}, Iter: {self.iter} / {self.cfg.iters}, Memory: {output_map["memory"]: .2f} GB, total_loss: {output_map["total_loss"]:.4f}"
             )
 
-        if self.iter % self.cfg.i_tf_writer:
+        if self.iter % self.cfg.i_tf_writer == 0:
             # Upload the output_map of the last mini batch
-            self._upload_metrics_to_tf(self.iter, output_map, "")
+            self._upload_metrics_to_tf(self.iter, output_map, "epoch_")
 
-        if self.iter % self.cfg.i_eval:
-            pass
+        if self.iter % self.cfg.i_eval == 0:
+            logger.info("Starting evaluation")
