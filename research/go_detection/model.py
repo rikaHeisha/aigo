@@ -55,7 +55,7 @@ class GoModel(nn.Module):
         #     nn.Conv2d(16, 3, kernel_size=1, padding=0, stride=1),
         # )
 
-        self.log_softmax = torch.nn.LogSoftmax(dim=1)
+        self.log_softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, images):
         x0 = images
@@ -68,7 +68,8 @@ class GoModel(nn.Module):
         x6 = self.stage6(x5)
         x7 = self.stage7(x6)
         x8 = self.stage8(x7.reshape(x7.shape[0], -1))
-        x_out = torch.softmax(x8, dim=1)
+        # x_out = torch.softmax(x8, dim=1)
+        x_out = self.log_softmax(x8)
 
         # x6 = x5[:, :, :19, :19]
         # x7 = self.head(x6)

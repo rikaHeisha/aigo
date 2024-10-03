@@ -53,7 +53,7 @@ class GoTrainer:
         self.load_checkpoint()
 
         # Create losses
-        self.nll_loss = nn.NLLLoss()
+        self.nll_loss = nn.NLLLoss(reduction="mean")
         self.model = self.model.cuda()
 
         # data_point = next(iter(self.train_dataloader))
@@ -179,9 +179,11 @@ class GoTrainer:
             # nll_loss = self.nll_loss(output, datapoints.labels)
             # nll_loss = self.nll_loss(output[0, :, 0, 0], datapoints.labels[0, 0, 0])
 
+            # rishi this is for debugging only
             target_label = datapoints.labels[:, 0, 0]
-            target_label = torch.nn.functional.one_hot(target_label, output.shape[1])
-            nll_loss = torch.square(output - target_label).mean()
+            # target_label = torch.nn.functional.one_hot(target_label, output.shape[1])
+            # nll_loss = torch.square(output - target_label).mean()
+            nll_loss = self.nll_loss(output, target_label)
 
             output_map["nll_loss"] = (nll_loss, 100.0)
 
