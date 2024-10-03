@@ -33,13 +33,14 @@ def main(cfg: SimCfg):
         debugpy.wait_for_client()
 
     OmegaConf.set_readonly(cfg, True)
-    cfg = instantiate(cfg)  # Converts the DictConfig to native python classes
 
-    # Save config info
+    # Save config info before instantiating
     exp_io = AssetIO(os.path.join(cfg.result_cfg.dir, cfg.result_cfg.name))
     exp_io.mkdir(".")
     exp_io.mkdir("log")
     exp_io.save_yaml("config.yaml", cfg)
+
+    cfg = instantiate(cfg)  # Converts the DictConfig to native python classes
 
     # Save git infomation
     git_info = get_git_info()
