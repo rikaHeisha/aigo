@@ -1,5 +1,7 @@
 import logging
 import os
+import time
+from os import path
 from typing import Dict, Tuple, TypeVar, Union, cast
 
 import numpy as np
@@ -32,7 +34,14 @@ class GoTrainer:
         # Create the tf writer
         self.results_io = cfg.result_cfg.get_asset_io()
         self.results_io.mkdir("tf")
-        self.tf_writer = SummaryWriter(self.results_io.get_abs("tf"))
+        run_number = (
+            len([_ for _ in self.results_io.ls("tf") if self.results_io.has_dir(_)]) + 1
+        )
+
+        tf_path = path.join("tf", f"run_{run_number}")
+        assert self.results_io.has(tf_path) == False
+        self.results_io.mkdir(tf_path)
+        self.tf_writer = SummaryWriter(self.results_io.get_abs(tf_path))
 
         # Create the model and optimizer
         self.iter = 1
@@ -45,18 +54,7 @@ class GoTrainer:
 
         # Create losses
         self.nll_loss = nn.NLLLoss()
-
         self.model = self.model.cuda()
-
-        # for i in range(400):
-        #     self.tf_writer.add_scalar(
-        #         "loss/mse", 1.0 * np.sin(i / 100.0 * 8 * np.pi), i
-        #     )
-
-        #     if i % 10 == 0:
-        #         self.tf_writer.add_scalar(
-        #             "loss/mse_2", 0.7 * np.sin(i / 100.0 * 8 * np.pi), i
-        #         )
 
         # data_point = next(iter(self.train_dataloader))
         # visualize_datapoints(
@@ -141,22 +139,26 @@ class GoTrainer:
 
             self.iter += 1
 
+        logging.info("Finished training")
+        self.tf_writer.flush()
+
     def _upload_metrics_to_tf(
         self,
         step,
         map_metrics: Dict[str, MetricValue],
         prefix: str = "",
     ):
+        metric_time = time.time()
         for key, metric in map_metrics.items():
             metric_name = f"{prefix}_{key}"
 
             if isinstance(metric, MetricPrimitive):
-                self.tf_writer.add_scalar(metric_name, metric, step)
+                self.tf_writer.add_scalar(metric_name, metric, step, metric_time)
             else:
                 assert isinstance(metric, tuple)
-                self.tf_writer.add_scalar(metric_name, metric[0], step)
+                self.tf_writer.add_scalar(metric_name, metric[0], step, metric_time)
                 self.tf_writer.add_scalar(
-                    f"{metric_name}_weighted", metric[0] * metric[1], step
+                    f"{metric_name}_weighted", metric[0] * metric[1], step, metric_time
                 )
 
     def step(self):
@@ -175,6 +177,7 @@ class GoTrainer:
 
             # assert datapoints.labels.max() < output.shape[1] and datapoints.labels.min() >= 0
             nll_loss = self.nll_loss(output, datapoints.labels)
+            # nll_loss = self.nll_loss(output[0, :, 0, 0], datapoints.labels[0, 0, 0])
             output_map["nll_loss"] = (nll_loss, 100.0)
 
             # Use print so this does not end up in the logs
@@ -206,7 +209,8 @@ class GoTrainer:
             )
 
         if self.iter % self.cfg.i_tf_writer:
-            self._upload_metrics_to_tf(mini_batch_idx, self.iter, "")
+            # Upload the output_map of the last mini batch
+            self._upload_metrics_to_tf(self.iter, output_map, "")
 
         if self.iter % self.cfg.i_eval:
             pass
