@@ -49,9 +49,10 @@ class AssetIO:
             self._abs(rel_path),
         )
 
-    def load_torch(self, rel_path: str):
+    def load_torch(self, rel_path: str, map_location: str = "cpu"):
         data = torch.load(
             self._abs(rel_path),
+            map_location=map_location,
             weights_only=True,
         )
         return data

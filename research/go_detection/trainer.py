@@ -26,6 +26,42 @@ MetricPrimitive = Union[float, torch.Tensor, int]
 MetricValue = Union[MetricPrimitive, Tuple[MetricPrimitive, float]]
 
 
+# For debugging
+# def _optimizer_get_devices(optim):
+#     devices = []
+#     for param in optim.state.values():
+#         # Not sure there are any global tensors in the state dict
+#         if isinstance(param, torch.Tensor):
+#             devices.append(param.data.device)
+#             if param._grad is not None:
+#                 print("Has global grad")
+#                 devices.append(param._grad.data.device)
+#         elif isinstance(param, dict):
+#             for subparam in param.values():
+#                 if isinstance(subparam, torch.Tensor):
+#                     devices.append(subparam.data.device)
+#                     if subparam._grad is not None:
+#                         print("Has grad")
+#                         devices.append(subparam._grad.data.device)
+#     return devices
+
+
+# def optimizer_to_device(optim, device):
+#     # See: https://discuss.pytorch.org/t/moving-optimizer-from-cpu-to-gpu/96068/2
+#     for param in optim.state.values():
+#         # Not sure there are any global tensors in the state dict
+#         if isinstance(param, torch.Tensor):
+#             param.data = param.data.to(device)
+#             if param._grad is not None:
+#                 param._grad.data = param._grad.data.to(device)
+#         elif isinstance(param, dict):
+#             for subparam in param.values():
+#                 if isinstance(subparam, torch.Tensor):
+#                     subparam.data = subparam.data.to(device)
+#                     if subparam._grad is not None:
+#                         subparam._grad.data = subparam._grad.data.to(device)
+
+
 class GoTrainer:
     def __init__(self, cfg: SimCfg):
         super().__init__()
@@ -46,6 +82,7 @@ class GoTrainer:
         # Create the model and optimizer
         self.iter = 1
         self.model = GoModel(self.cfg.model_cfg)
+        self.model = self.model.cuda()
         self.optimizer = torch.optim.Adam(self.get_parameters(), lr=1e-4)
 
         # Create the dataloader and load checkpoint
@@ -54,7 +91,6 @@ class GoTrainer:
 
         # Create losses
         self.nll_loss = nn.NLLLoss(reduction="mean")
-        self.model = self.model.cuda()
 
         # data_point = next(iter(self.train_dataloader))
         # visualize_datapoints(
@@ -69,10 +105,10 @@ class GoTrainer:
         # )
 
     def _load_or_create_dataloader(self):
-        logger.info("Loading dataset")
 
         if self.results_io.has_file("dataset_split.pt"):
             # Load dataset
+            logger.info("Loading dataset split from file")
             torch.serialization.add_safe_globals([DataPointPath])
             dataset_split = self.results_io.load_torch("dataset_split.pt")
 
@@ -80,6 +116,7 @@ class GoTrainer:
                 self.cfg.data_cfg, dataset_split["train"], dataset_split["test"]
             )
         else:
+            logger.info("Creating dataset split")
             train_dataloader, test_dataloader = create_datasets(self.cfg.data_cfg)
 
             self.results_io.save_torch(
@@ -89,11 +126,6 @@ class GoTrainer:
                     "test": test_dataloader.dataset.datapoint_paths,
                 },
             )
-
-            # torch.serialization.add_safe_globals([DataPointPath])
-            # dataset_split = self.results_io.load_torch("dataset_split.pt")
-            # assert dataset_split["train"] == train_dataloader.dataset.datapoint_paths
-            # assert dataset_split["test"] == test_dataloader.dataset.datapoint_paths
 
         # Print dataset info
         num_train = len(train_dataloader.dataset)
@@ -105,15 +137,46 @@ class GoTrainer:
         )
         return train_dataloader, test_dataloader
 
+    def _upload_metrics_to_tf(
+        self,
+        step,
+        map_metrics: Dict[str, MetricValue],
+        prefix: str = "",
+    ):
+        metric_time = time.time()
+        for key, metric in map_metrics.items():
+            metric_name = f"{prefix}{key}"
+
+            if isinstance(metric, MetricPrimitive):
+                self.tf_writer.add_scalar(metric_name, metric, step, metric_time)
+            else:
+                assert isinstance(metric, tuple)
+                self.tf_writer.add_scalar(metric_name, metric[0], step, metric_time)
+                self.tf_writer.add_scalar(
+                    f"{metric_name}_weighted", metric[0] * metric[1], step, metric_time
+                )
+
+        # TODO(rishi): See if this is necessary or not
+        self.tf_writer.flush()
+
     def load_checkpoint(self):
+        # TODO(rishi) add a load config
         if not self.results_io.has_file("checkpoint.pt"):
             return
 
         checkpoint_data = self.results_io.load_torch("checkpoint.pt")
-        self.iter = cast(int, checkpoint_data["cur_iter"])
+
+        cur_iter = cast(int, checkpoint_data["cur_iter"])
+        self.iter = cur_iter + 1
         self.model.load_state_dict(checkpoint_data["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint_data["optimizer_state_dict"])
-        logging.info(f"Loaded checkpoint at iter: {self.iter}")
+        logging.info(
+            f"Loaded checkpoint at iter {cur_iter}. Resuming from iter {self.iter}"
+        )
+
+        # If you face device issues then try uncommentings these lines
+        # self.model = self.model.cuda()
+        # _optimizer_to_device(self.optimizer, "cuda")
 
     def save_checkpoint(self):
         checkpoint_data = {
@@ -128,13 +191,32 @@ class GoTrainer:
         parameters = self.model.parameters()
         return parameters
 
+    def evaluate(
+        self, path: str, render_corner_points: bool = True, render_labels: bool = True
+    ):
+        pass  # TODO(rishi) do this tomorrow
+
     def start(self):
         logging.info("Starting training")
 
         while self.iter <= self.cfg.iters:
-            self.step()
+            output_map = self.train_step()
+
+            if self.iter % self.cfg.i_print == 0:
+                logger.info(
+                    f'Exp: {self.cfg.result_cfg.name}, Iter: {self.iter} / {self.cfg.iters}, Memory: {output_map["memory"]: .2f} GB, total_loss: {output_map["total_loss"]:.4f}'
+                )
 
             if self.iter % self.cfg.i_weight == 0:
+                logger.info("Starting saving checkpoint")
+                self.save_checkpoint()
+
+            if self.iter % self.cfg.i_tf_writer == 0:
+                # Upload the output_map of the last mini batch
+                logger.info("Uploading epoch to tensorboard")
+                self._upload_metrics_to_tf(self.iter, output_map, "epoch__")
+
+            if self.iter % self.cfg.i_eval == 0:
                 logger.info("Starting evaluation")
 
             self.iter += 1
@@ -142,34 +224,14 @@ class GoTrainer:
         logging.info("Finished training")
         self.tf_writer.flush()
 
-    def _upload_metrics_to_tf(
-        self,
-        step,
-        map_metrics: Dict[str, MetricValue],
-        prefix: str = "",
-    ):
-        metric_time = time.time()
-        for key, metric in map_metrics.items():
-            metric_name = f"{prefix}_{key}"
-
-            if isinstance(metric, MetricPrimitive):
-                self.tf_writer.add_scalar(metric_name, metric, step, metric_time)
-            else:
-                assert isinstance(metric, tuple)
-                self.tf_writer.add_scalar(metric_name, metric[0], step, metric_time)
-                self.tf_writer.add_scalar(
-                    f"{metric_name}_weighted", metric[0] * metric[1], step, metric_time
-                )
-
-        # TODO(rishi): See if this is necessary or not
-        self.tf_writer.flush()
-
-    def step(self):
-
+    def train_step(self):
         # Iterate through all the training datasets
-        output_map = {}
+        output_map: Dict[str, MetricValue] = {}
+        self.model.train()
+
         for idx, datapoints in enumerate(self.train_dataloader, 1):
-            output_map: Dict[str, MetricValue] = {}
+            # Reset output map every iteration
+            output_map = {}
 
             num_images = datapoints.images.shape[0]
 
@@ -179,25 +241,26 @@ class GoTrainer:
                 datapoints[2].cuda(),
             )
             output = self.model(datapoints.images)
+            gt_labels = datapoints.labels.reshape(num_images, -1)
 
-            # assert datapoints.labels.max() < output.shape[1] and datapoints.labels.min() >= 0
-            # nll_loss = self.nll_loss(output, datapoints.labels)
-            # nll_loss = self.nll_loss(output[0, :, 0, 0], datapoints.labels[0, 0, 0])
-
-            # rishi this is for debugging only
-            target_label = datapoints.labels.reshape(num_images, -1)
-            nll_loss = self.nll_loss(output, target_label)
+            # Check that the shape matches what we are giving to self.nll_loss
+            assert (
+                gt_labels.shape[1:] == output.shape[2:]
+                and gt_labels.shape[0] == num_images
+                and output.shape[0] == num_images
+            )
+            assert gt_labels.max() < output.shape[1] and gt_labels.min() >= 0
+            nll_loss = self.nll_loss(output, gt_labels)
 
             # Manuall calculate the NLL loss
-            # target_label_2 = torch.nn.functional.one_hot(datapoints.labels.reshape(num_images, -1), output.shape[1])
-            # nll_loss = (-output.transpose(1,2) * target_label_2).sum(dim=-1).mean()
-
-            # MSE loss
-            # nll_loss = torch.square(output - target_label_2).mean()
+            # target_label_one_hot = torch.nn.functional.one_hot(gt_labels, output.shape[1])
+            # nll_loss_2 = (-output * target_label_one_hot.transpose(1,2)).sum(dim=1).mean()
 
             output_map["nll_loss"] = (nll_loss, 100.0)
 
-            # Use print so this does not end up in the logs
+            #########################
+            # Calculate total loss
+            #########################
             total_loss = torch.tensor(0.0).cuda()
             for key, value in output_map.items():
                 if "loss" in key:
@@ -209,25 +272,19 @@ class GoTrainer:
             memory_gb = torch.cuda.max_memory_allocated() / 1024**3
             output_map["memory"] = memory_gb
 
+            # Use print so this does not end up in the logs
             print(
                 f"Exp: {self.cfg.result_cfg.name}, Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {memory_gb: .2f} GB, total_loss: {total_loss:.4f}"
             )
 
             mini_batch_idx = (self.iter - 1) * len(self.train_dataloader) + idx
-            self._upload_metrics_to_tf(mini_batch_idx, output_map, "batch_")
+            self._upload_metrics_to_tf(
+                mini_batch_idx, output_map, "batch__"
+            )  # TODO(rishi): add a config for this so we dont push every tick?
 
-            self.optimizer.zero_grad()
+            self.optimizer.zero_grad(set_to_none=True)
             total_loss.backward()
             self.optimizer.step()
 
-        if self.iter % self.cfg.i_print == 0:
-            logger.info(
-                f"Exp: {self.cfg.result_cfg.name}, Iter: {self.iter} / {self.cfg.iters}, Memory: {output_map["memory"]: .2f} GB, total_loss: {output_map["total_loss"]:.4f}"
-            )
-
-        if self.iter % self.cfg.i_tf_writer == 0:
-            # Upload the output_map of the last mini batch
-            self._upload_metrics_to_tf(self.iter, output_map, "epoch_")
-
-        if self.iter % self.cfg.i_eval == 0:
-            logger.info("Starting evaluation")
+        # Completed one epoch
+        return output_map

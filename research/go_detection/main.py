@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from datetime import datetime
+from os import path
 from typing import List, Optional
 
 import debugpy
@@ -34,13 +35,14 @@ def main(cfg: SimCfg):
 
     OmegaConf.set_readonly(cfg, True)
 
-    # Save config info before instantiating
-    exp_io = AssetIO(os.path.join(cfg.result_cfg.dir, cfg.result_cfg.name))
+    cfg = instantiate(cfg)  # Converts the DictConfig to native python classes
+
+    # Save config info after instantiating. instantiation causes interpolations to get resolved. So the config file generated will have
+    # all interpolations resolved
+    exp_io = AssetIO(path.join(cfg.result_cfg.dir, cfg.result_cfg.name))
     exp_io.mkdir(".")
     exp_io.mkdir("log")
     exp_io.save_yaml("config.yaml", cfg)
-
-    cfg = instantiate(cfg)  # Converts the DictConfig to native python classes
 
     # Save git infomation
     git_info = get_git_info()
@@ -56,17 +58,30 @@ def main(cfg: SimCfg):
         },
     )
 
+    ########################
+    # Logging
+    ########################
     # Setup file logger manually (after the log folder is created)
     # Add cli arg hydra.job_logging.root.level=ERROR to set log level
-    str_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_file = f"{cfg.result_cfg.dir}/{cfg.result_cfg.name}/log/{str_now}.log"
+
+    # str_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # rel_path = path.join("log", f"{str_now}.log")
+    run_number = (
+        len([_ for _ in exp_io.ls("log") if exp_io.has_file(_) and _.endswith(".log")])
+        + 1
+    )
+    rel_path = path.join("log", f"log_{run_number}.log")
+    assert exp_io.has(rel_path) == False
+    log_file = exp_io.get_abs(rel_path)
     fh = logging.FileHandler(filename=log_file)
     fh.setFormatter(
         logging.Formatter(fmt="[%(asctime)s][%(name)s][%(levelname)s] - %(message)s")
     )
     logging.getLogger().addHandler(fh)
 
+    ########################
     # Print config
+    ########################
     cfg_yaml = OmegaConf.to_yaml(cfg)
     logger.info("Config:\n%s", cfg_yaml)
 

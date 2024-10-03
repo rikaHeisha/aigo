@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from go_detection.common.asset_io import AssetIO
 
@@ -23,9 +23,9 @@ class DataCfg:
 
 @dataclass
 class ResultCfg:
-    name: str
     dir: str
 
+    name: str = "${exp_name}"
     _target_: str = f"{__module__}.{__qualname__}"
 
     def get_asset_io(self) -> AssetIO:
@@ -39,14 +39,14 @@ class ModelCfg:
 
 @dataclass
 class SimCfg:
-    iters: int
-    i_eval: int
-    i_weight: int
-    i_tf_writer: int
-    i_print: int
-
     data_cfg: DataCfg
     model_cfg: ModelCfg
     result_cfg: ResultCfg
 
+    exp_name: str
+    iters: int
+    i_eval: int
+    i_weight: int
+    i_print: int
+    i_tf_writer: int = cast(int, "${i_print}")  # TODO(rishi) move this to a tf_config
     _target_: str = f"{__module__}.{__qualname__}"

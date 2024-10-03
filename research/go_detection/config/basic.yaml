@@ -3,10 +3,10 @@ defaults:
   - sim_cfg_default
   - _self_
 
+exp_name: basic
 iters: 1000
 i_weight:  1
-i_eval: 100
-i_tf_writer: 1
+i_eval: 1
 i_print: 1
 
 data_cfg:
@@ -21,4 +21,3 @@ model_cfg: {}
 
 result_cfg:
   dir: /home/rmenon/Desktop/dev/ml_results/aigo_results
-  name: basic
