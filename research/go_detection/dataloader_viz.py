@@ -163,6 +163,15 @@ def visualize_grid(
     # sys.exit(0)
 
 
+def visualize_grid_pyplot(
+    data_points: DataPoints,
+    output_path: str,
+    index: int,
+    predicted_label: torch.Tensor,
+):
+    pass
+
+
 ################################################################################################
 # Old unused viz
 
