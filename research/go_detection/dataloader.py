@@ -37,6 +37,13 @@ class DataPoints:
     labels: torch.Tensor
     board_pts: torch.Tensor
 
+    def cpu(self):
+        return DataPoints(
+            self.images.cpu(),
+            self.labels.cpu(),
+            self.board_pts.cpu(),
+        )
+
 
 logger = logging.getLogger(__name__)
 
@@ -143,12 +150,62 @@ def _visualize_single_helper(
     axis.set_aspect("auto")
 
 
+def _draw_board(axis, board_grid_pt):
+    colors = _label_to_color(1)
+    axis.scatter(
+        (board_grid_pt[:, 0]) + 0.5,
+        (board_grid_pt[:, 1]) + 0.5,
+        facecolors=colors,
+        # edgecolors="#606060",
+        # c=colors,
+        marker="s",
+        s=4000,
+        # linewidth=3,
+    )
+
+
+def _draw_pieces(axis, grid_pt, label):
+    label = label.reshape(-1)
+    mask = (label != 1).nonzero().squeeze(1)
+
+    pieces_grid_pt = grid_pt[mask]
+    pieces_label = label[mask]
+    assert (pieces_label != 1).all()
+
+    pieces_colors = [_label_to_color(l) for l in pieces_label]
+    axis.scatter(
+        (pieces_grid_pt[:, 0]).int(),
+        (pieces_grid_pt[:, 1]).int(),
+        facecolors=pieces_colors,
+        # edgecolors="#606060",
+        # c=colors,
+        marker="o",
+        s=2000,
+    )
+
+
+def _draw_correct_incorrect(axis, grid_pt, label, predicted_label):
+    colors = [("green" if l else "red") for l in (predicted_label == label).reshape(-1)]
+    axis.scatter(
+        (grid_pt[:, 0]).int(),
+        (grid_pt[:, 1]).int(),
+        facecolors=colors,
+        # edgecolors="red",
+        # c=colors,
+        marker="o",
+        s=2000,
+    )
+
+
 def visualize_grid(
     data_points: DataPoints,
     output_path: str,
     index: int,
     predicted_label: torch.Tensor,
 ):
+    data_points = data_points.cpu()
+    predicted_label = predicted_label.cpu()
+
     (num_images, _, height, width) = data_points.images.shape
     assert index < num_images
     label = data_points.labels[index]
@@ -159,55 +216,44 @@ def visualize_grid(
     meshgrid = torch.meshgrid(xs, ys, indexing="xy")
     grid_pt = torch.stack(meshgrid, dim=2).reshape(-1, 2)
 
-    fig, axis = plt.subplots(figsize=(25, 25))
+    xs = torch.arange(0, label.shape[0] - 1)
+    ys = torch.arange(0, label.shape[1] - 1)
+    meshgrid = torch.meshgrid(xs, ys, indexing="xy")
+    board_grid_pt = torch.stack(meshgrid, dim=2).reshape(-1, 2)
 
-    colors = [("green" if l else "red") for l in (predicted_label == label).reshape(-1)]
-    axis.scatter(
-        (grid_pt[:, 0]).int(),
-        (grid_pt[:, 1]).int(),
-        facecolors=colors,
-        # edgecolors="red",
-        # c=colors,
-        marker="s",
-        s=4000,
+    # fig, axis = plt.subplots(figsize=(25, 25))
+    fig, axes = plt.subplots(
+        1, 3, gridspec_kw={"wspace": 0, "hspace": 0}, figsize=(25 * 3, 25 * 3)
     )
+    if isinstance(axes, np.ndarray):
+        if axes.ndim == 1:
+            axes = list(axes)
+        else:
+            axes = list(itertools.chain(*axes))
+    else:
+        axes = [axes]
 
-    colors = [_label_to_color(l) for l in label.reshape(-1)]
-    axis.scatter(
-        (grid_pt[:, 0]).int(),
-        (grid_pt[:, 1]).int(),
-        facecolors=colors,
-        # edgecolors="#606060",
-        # c=colors,
-        marker="o",
-        s=2000,
-        # linewidth=3,
-    )
+    _draw_board(axes[0], board_grid_pt)
+    _draw_pieces(axes[0], grid_pt, label)
 
-    colors = [_label_to_color(l) for l in predicted_label.reshape(-1)]
-    axis.scatter(
-        (grid_pt[:, 0]).int(),
-        (grid_pt[:, 1]).int(),
-        facecolors=colors,
-        edgecolors="#606060",
-        # c=colors,
-        marker="o",
-        s=750,
-        linewidth=3,
-    )
+    _draw_board(axes[1], board_grid_pt)
+    _draw_pieces(axes[1], grid_pt, predicted_label)
+
+    _draw_board(axes[2], board_grid_pt)
+    _draw_correct_incorrect(axes[2], grid_pt, label, predicted_label)
 
     # axis.axis("off")
-    axis.set_facecolor("#222222")
-
-    axis.set_aspect("equal")
-    axis.xaxis.set_visible(False)  # Hide x-axis
-    axis.yaxis.set_visible(False)  # Hide y-axis
-    axis.set_xticklabels([])  # Hide x-axis labels
-    axis.set_yticklabels([])  # Hide y-axis labels
-    axis.spines["top"].set_visible(False)  # Hide the top spine
-    axis.spines["right"].set_visible(False)  # Hide the right spine
-    axis.spines["left"].set_visible(False)  # Hide the left spine
-    axis.spines["bottom"].set_visible(False)  # Hide the bottom spine
+    for axis in axes:
+        axis.set_facecolor("#222222")
+        axis.set_aspect("equal")
+        axis.xaxis.set_visible(False)  # Hide x-axis
+        axis.yaxis.set_visible(False)  # Hide y-axis
+        axis.set_xticklabels([])  # Hide x-axis labels
+        axis.set_yticklabels([])  # Hide y-axis labels
+        axis.spines["top"].set_visible(False)  # Hide the top spine
+        axis.spines["right"].set_visible(False)  # Hide the right spine
+        axis.spines["left"].set_visible(False)  # Hide the left spine
+        axis.spines["bottom"].set_visible(False)  # Hide the bottom spine
 
     plt.savefig(output_path, bbox_inches="tight", pad_inches=0)
     plt.close(fig)
