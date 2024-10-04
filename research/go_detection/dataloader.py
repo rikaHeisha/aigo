@@ -4,7 +4,7 @@ import random
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List
+from typing import List, cast
 
 import numpy as np
 import torch
@@ -113,13 +113,14 @@ def custom_collate_fn(batches) -> DataPoints:
     board_pts = []
 
     for batch in batches:
+        batch = cast(DataPoint, batch)
         images.append(batch.image)
         labels.append(batch.label)
         board_pts.append(batch.board_pt)
 
-        assert images[0].shape == batch[0].shape
-        assert labels[0].shape == batch[1].shape
-        assert board_pts[0].shape == batch[2].shape
+        assert images[0].shape == batch.image.shape
+        assert labels[0].shape == batch.label.shape
+        assert board_pts[0].shape == batch.board_pt.shape
 
     images = torch.stack(images, dim=0)
     labels = torch.stack(labels, dim=0)

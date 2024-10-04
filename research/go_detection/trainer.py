@@ -301,12 +301,7 @@ class GoTrainer:
 
             num_images = datapoints.images.shape[0]
 
-            # TODO(rishi): change this to DataPoints.cuda()
-            datapoints = DataPoints(
-                datapoints[0].cuda(),
-                datapoints[1].cuda(),
-                datapoints[2].cuda(),
-            )
+            datapoints = datapoints.cuda()
             output = self.model(datapoints.images)
             gt_labels = datapoints.labels.reshape(num_images, -1)
 

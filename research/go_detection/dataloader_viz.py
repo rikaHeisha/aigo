@@ -155,6 +155,7 @@ def _draw_correct_incorrect(axis, grid_pt, label, predicted_label):
     )
 
 
+# TODO(rishi): change to 2x2 grid, and add original image to this
 def visualize_grid(
     data_points: DataPoints,
     output_path: str,
@@ -181,7 +182,7 @@ def visualize_grid(
 
     # fig, axis = plt.subplots(figsize=(25, 25))
     fig, axes = plt.subplots(
-        1, 3, gridspec_kw={"wspace": 0, "hspace": 0}, figsize=(25 * 3, 25 * 3)
+        2, 2, gridspec_kw={"wspace": 0, "hspace": 0}, figsize=(25 * 3, 25 * 3)
     )
     if isinstance(axes, np.ndarray):
         if axes.ndim == 1:
@@ -191,14 +192,19 @@ def visualize_grid(
     else:
         axes = [axes]
 
-    _draw_board(axes[0], board_grid_pt)
-    _draw_pieces(axes[0], grid_pt, label)
+    image = data_points.images[index]
+    image = image.transpose(0, 1).transpose(1, 2)  # Convert CHW to HWC
+    image = image.clamp(0.0, 1.0)
+    axes[0].imshow(image)
 
     _draw_board(axes[1], board_grid_pt)
-    _draw_pieces(axes[1], grid_pt, predicted_label)
+    _draw_pieces(axes[1], grid_pt, label)
 
     _draw_board(axes[2], board_grid_pt)
-    _draw_correct_incorrect(axes[2], grid_pt, label, predicted_label)
+    _draw_pieces(axes[2], grid_pt, predicted_label)
+
+    _draw_board(axes[3], board_grid_pt)
+    _draw_correct_incorrect(axes[3], grid_pt, label, predicted_label)
 
     # axis.axis("off")
     for axis in axes:
