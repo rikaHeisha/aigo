@@ -15,10 +15,8 @@ from go_detection.dataloader import (
     DataPoints,
     create_datasets,
     load_datasets,
-    visualize_datapoints,
-    visualize_grid,
-    visualize_single_datapoint,
 )
+from go_detection.dataloader_viz import visualize_grid, visualize_single_datapoint
 from go_detection.model import GoModel
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
@@ -217,13 +215,10 @@ class GoTrainer:
         # Actually a great way of doing this will be to iterate through the whole dataset and selectively rendering. This is a good idea since we anyway have to iterate through the entire thing
         for idx in tqdm(indices, desc=f"Rendering for iter {self.iter}"):
             data_point = cast(DataPoint, self.test_dataloader.dataset[idx])
-            data_points = DataPoints(
-                data_point.image.unsqueeze(0).cuda(),
-                data_point.label.unsqueeze(0).cuda(),
-                data_point.board_pt.unsqueeze(0).cuda(),
-            )
+            data_points = data_point.to_data_points().cuda()
 
             output = self.model(data_points.images)
+
             (_, predicted_label) = output[0].max(dim=0)
             predicted_label = predicted_label.reshape(data_points.labels[0].shape)
 
