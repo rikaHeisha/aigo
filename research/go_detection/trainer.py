@@ -16,7 +16,7 @@ from go_detection.dataloader import (
     create_datasets,
     load_datasets,
 )
-from go_detection.dataloader_viz import visualize_grid, visualize_single_datapoint
+from go_detection.dataloader_viz import visualize_grid
 from go_detection.model import GoModel
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
@@ -197,17 +197,13 @@ class GoTrainer:
         self,
         evaluate_path: str,
         render_index: List[int],
-        overlay_corner: bool = True,
-        overlay_points: bool = True,
-        grid_label: bool = True,
+        render_grid: bool = True,
     ):
         self.model.eval()
         # with torch.no_grad():
 
         eval_io = self.results_io.cd(evaluate_path)
-        eval_io.mkdir("overlay_corner")
-        eval_io.mkdir("overlay_points")
-        eval_io.mkdir("grid_label")
+        eval_io.mkdir("render_grid")
 
         indices = render_index or list(range(len(self.test_dataloader.dataset)))
 
@@ -222,21 +218,9 @@ class GoTrainer:
             (_, predicted_label) = output[0].max(dim=0)
             predicted_label = predicted_label.reshape(data_points.labels[0].shape)
 
-            if overlay_corner:
+            if render_grid:
                 img_path = eval_io.get_abs(
-                    path.join("overlay_corner", f"image_{idx:04}.png"),
-                )
-                visualize_single_datapoint(data_points, img_path, 0, True, False)
-
-            if overlay_points:
-                img_path = eval_io.get_abs(
-                    path.join("overlay_points", f"image_{idx:04}.png"),
-                )
-                visualize_single_datapoint(data_points, img_path, 0, False, True)
-
-            if grid_label:
-                img_path = eval_io.get_abs(
-                    path.join("grid_label", f"image_{idx:04}.png"),
+                    path.join("render_grid", f"image_{idx:04}.png"),
                 )
                 visualize_grid(data_points, img_path, 0, predicted_label)
 
@@ -248,9 +232,7 @@ class GoTrainer:
         self.evaluate(
             path.join("results", f"iter_{self.iter:05}"),
             self.cfg.result_cfg.eval_cfg.render_index,
-            self.cfg.result_cfg.eval_cfg.overlay_corner,
-            self.cfg.result_cfg.eval_cfg.overlay_points,
-            self.cfg.result_cfg.eval_cfg.grid_label,
+            self.cfg.result_cfg.eval_cfg.render_grid,
         )
         sys.exit(0)
 
@@ -280,9 +262,7 @@ class GoTrainer:
                 self.evaluate(
                     evaluate_path,
                     eval_cfg.render_index,
-                    eval_cfg.overlay_corner,
-                    eval_cfg.overlay_points,
-                    eval_cfg.grid_label,
+                    eval_cfg.render_grid,
                 )
 
             self.iter += 1
@@ -341,7 +321,7 @@ class GoTrainer:
 
             mini_batch_idx = (self.iter - 1) * len(self.train_dataloader) + idx
             self._upload_metrics_to_tf(
-                mini_batch_idx, output_map, "batch__"
+                mini_batch_idx, output_map, "step__"
             )  # TODO(rishi): add a config for this so we dont push every tick?
 
             self.optimizer.zero_grad(set_to_none=True)

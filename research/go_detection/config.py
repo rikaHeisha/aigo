@@ -23,9 +23,7 @@ class DataCfg:
 
 @dataclass
 class EvalCfg:
-    overlay_corner: bool = True
-    overlay_points: bool = True
-    grid_label: bool = True
+    render_grid: bool = True
 
     render_index: List = field(default_factory=list)
 

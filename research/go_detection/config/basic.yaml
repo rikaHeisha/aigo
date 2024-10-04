@@ -22,9 +22,7 @@ model_cfg: {}
 result_cfg:
   dir: /home/rmenon/Desktop/dev/ml_results/aigo_results
   eval_cfg:
-    overlay_corner: False
-    overlay_points: False
-    grid_label: True
+    render_grid: True
 
     render_index:
       - 0
