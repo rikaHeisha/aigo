@@ -245,14 +245,14 @@ class GoTrainer:
     def start(self):
         logging.info("Starting training")
 
-        # self.evaluate(
-        #     path.join("results", f"iter_{self.iter:05}"),
-        #     self.cfg.result_cfg.eval_cfg.render_index,
-        #     self.cfg.result_cfg.eval_cfg.overlay_corner,
-        #     self.cfg.result_cfg.eval_cfg.overlay_points,
-        #     self.cfg.result_cfg.eval_cfg.grid_label,
-        # )
-        # sys.exit(0)
+        self.evaluate(
+            path.join("results", f"iter_{self.iter:05}"),
+            self.cfg.result_cfg.eval_cfg.render_index,
+            self.cfg.result_cfg.eval_cfg.overlay_corner,
+            self.cfg.result_cfg.eval_cfg.overlay_points,
+            self.cfg.result_cfg.eval_cfg.grid_label,
+        )
+        sys.exit(0)
 
         while self.iter <= self.cfg.iters:
             output_map = self.train_step()

@@ -117,7 +117,7 @@ def _draw_board(axis, board_grid_pt):
         # edgecolors="#606060",
         # c=colors,
         marker="s",
-        s=4000,
+        s=8000,
         # linewidth=3,
     )
 
@@ -138,7 +138,7 @@ def _draw_pieces(axis, grid_pt, label):
         # edgecolors="#606060",
         # c=colors,
         marker="o",
-        s=2000,
+        s=4000,
     )
 
 
@@ -151,11 +151,11 @@ def _draw_correct_incorrect(axis, grid_pt, label, predicted_label):
         # edgecolors="red",
         # c=colors,
         marker="o",
-        s=2000,
+        s=4000,
     )
 
 
-# TODO(rishi): change to 2x2 grid, and add original image to this
+# TODO(rishi): change to 2x2 grid, and add original image to this. Fix the y flipped issue. Use GridSpec for exact grid layout
 def visualize_grid(
     data_points: DataPoints,
     output_path: str,
@@ -195,7 +195,9 @@ def visualize_grid(
     image = data_points.images[index]
     image = image.transpose(0, 1).transpose(1, 2)  # Convert CHW to HWC
     image = image.clamp(0.0, 1.0)
+
     axes[0].imshow(image)
+    # _draw_board(axes[0], board_grid_pt)
 
     _draw_board(axes[1], board_grid_pt)
     _draw_pieces(axes[1], grid_pt, label)
@@ -206,8 +208,27 @@ def visualize_grid(
     _draw_board(axes[3], board_grid_pt)
     _draw_correct_incorrect(axes[3], grid_pt, label, predicted_label)
 
-    # axis.axis("off")
-    for axis in axes:
+    axes[0].axis("off")
+    axes[0].set_aspect("equal")
+    axes[0].set_xlim(0, width)
+    axes[0].set_ylim(
+        height,
+    )
+
+    # axes[0].set_facecolor("#222222")
+    # axes[0].set_aspect("equal")
+    # axes[0].set_xlim(-0.5, 18.5)
+    # axes[0].set_ylim(-0.5, 18.5)
+    # axes[0].xaxis.set_visible(False)  # Hide x-axis
+    # axes[0].yaxis.set_visible(False)  # Hide y-axis
+    # axes[0].set_xticklabels([])  # Hide x-axis labels
+    # axes[0].set_yticklabels([])  # Hide y-axis labels
+    # axes[0].spines["top"].set_visible(False)  # Hide the top spine
+    # axes[0].spines["right"].set_visible(False)  # Hide the right spine
+    # axes[0].spines["left"].set_visible(False)  # Hide the left spine
+    # axes[0].spines["bottom"].set_visible(False)  # Hide the bottom spine
+
+    for axis in axes[1:]:
         axis.set_facecolor("#222222")
         axis.set_aspect("equal")
         axis.set_xlim(-0.5, 18.5)
