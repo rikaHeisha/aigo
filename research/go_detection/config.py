@@ -22,8 +22,20 @@ class DataCfg:
 
 
 @dataclass
+class EvalCfg:
+    overlay_corner: bool = True
+    overlay_points: bool = True
+    grid_label: bool = True
+
+    render_index: List = field(default_factory=list)
+
+    _target_: str = f"{__module__}.{__qualname__}"
+
+
+@dataclass
 class ResultCfg:
     dir: str
+    eval_cfg: EvalCfg
 
     name: str = "${exp_name}"
     _target_: str = f"{__module__}.{__qualname__}"

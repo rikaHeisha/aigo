@@ -1,8 +1,10 @@
 import itertools
 import logging
 import random
-from collections import defaultdict, namedtuple
-from typing import List, Tuple
+import sys
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import List, NamedTuple, Tuple
 
 import numpy as np
 import torch
@@ -14,9 +16,27 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset, Sampler
 from tqdm import tqdm
 
-DataPointPath = namedtuple("DataPointPath", ["image_path", "label_path", "board_path"])
-DataPoint = namedtuple("DataPoint", ["image", "label", "board_pt"])
-DataPoints = namedtuple("DataPoints", ["images", "labels", "board_pts"])
+
+@dataclass
+class DataPointPath:
+    image_path: str
+    label_path: str
+    board_path: str
+
+
+@dataclass
+class DataPoint:
+    image: torch.Tensor
+    label: torch.Tensor
+    board_pt: torch.Tensor
+
+
+@dataclass
+class DataPoints:
+    images: torch.Tensor
+    labels: torch.Tensor
+    board_pts: torch.Tensor
+
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +77,19 @@ def _convert_points(points: torch.Tensor, board_pt: torch.Tensor):
     return image_points
 
 
+def _label_to_color(lab):
+    if lab == 0:
+        # black
+        return "black"
+    elif lab == 1:
+        # empty
+        return "#ECC350"
+    else:
+        # white
+        assert lab == 2
+        return "white"
+
+
 def _visualize_single_helper(
     axis,
     image: torch.Tensor,
@@ -65,18 +98,14 @@ def _visualize_single_helper(
     viz_corner_points: bool = True,
     viz_all_points: bool = False,
 ):
-    def _label_to_color(lab):
-        if lab == 0:
-            return "black"
-        elif lab == 1:
-            return "green"
-        else:
-            assert lab == 2
-            return "white"
-
     (_, height, width) = image.shape
     image = image.transpose(0, 1).transpose(1, 2)  # Convert CHW to HWC
     image = image.clamp(0.0, 1.0)
+
+    image = image.cpu()
+    label = label.cpu()
+    board_pt = board_pt.cpu()
+
     axis.imshow(image)
 
     # Corner points
@@ -114,7 +143,85 @@ def _visualize_single_helper(
     axis.set_aspect("auto")
 
 
-def visualize_single_datapoint(data_points: DataPoints, output_path: str, index: int):
+def visualize_grid(
+    data_points: DataPoints,
+    output_path: str,
+    index: int,
+    predicted_label: torch.Tensor,
+):
+    (num_images, _, height, width) = data_points.images.shape
+    assert index < num_images
+    label = data_points.labels[index]
+    assert predicted_label.shape == label.shape
+
+    xs = torch.arange(0, label.shape[0])
+    ys = torch.arange(0, label.shape[1])
+    meshgrid = torch.meshgrid(xs, ys, indexing="xy")
+    grid_pt = torch.stack(meshgrid, dim=2).reshape(-1, 2)
+
+    fig, axis = plt.subplots(figsize=(25, 25))
+
+    colors = [("green" if l else "red") for l in (predicted_label == label).reshape(-1)]
+    axis.scatter(
+        (grid_pt[:, 0]).int(),
+        (grid_pt[:, 1]).int(),
+        facecolors=colors,
+        # edgecolors="red",
+        # c=colors,
+        marker="s",
+        s=4000,
+    )
+
+    colors = [_label_to_color(l) for l in label.reshape(-1)]
+    axis.scatter(
+        (grid_pt[:, 0]).int(),
+        (grid_pt[:, 1]).int(),
+        facecolors=colors,
+        # edgecolors="#606060",
+        # c=colors,
+        marker="o",
+        s=2000,
+        # linewidth=3,
+    )
+
+    colors = [_label_to_color(l) for l in predicted_label.reshape(-1)]
+    axis.scatter(
+        (grid_pt[:, 0]).int(),
+        (grid_pt[:, 1]).int(),
+        facecolors=colors,
+        edgecolors="#606060",
+        # c=colors,
+        marker="o",
+        s=750,
+        linewidth=3,
+    )
+
+    # axis.axis("off")
+    axis.set_facecolor("#222222")
+
+    axis.set_aspect("equal")
+    axis.xaxis.set_visible(False)  # Hide x-axis
+    axis.yaxis.set_visible(False)  # Hide y-axis
+    axis.set_xticklabels([])  # Hide x-axis labels
+    axis.set_yticklabels([])  # Hide y-axis labels
+    axis.spines["top"].set_visible(False)  # Hide the top spine
+    axis.spines["right"].set_visible(False)  # Hide the right spine
+    axis.spines["left"].set_visible(False)  # Hide the left spine
+    axis.spines["bottom"].set_visible(False)  # Hide the bottom spine
+
+    plt.savefig(output_path, bbox_inches="tight", pad_inches=0)
+    plt.close(fig)
+    # plt.show()
+    # sys.exit(0)
+
+
+def visualize_single_datapoint(
+    data_points: DataPoints,
+    output_path: str,
+    index: int,
+    viz_corner_points: bool = True,
+    viz_all_points: bool = False,
+):
     num_images = data_points.images.shape[0]
     assert index < num_images
 
@@ -124,6 +231,8 @@ def visualize_single_datapoint(data_points: DataPoints, output_path: str, index:
         data_points.images[index],
         data_points.labels[index],
         data_points.board_pts[index],
+        viz_corner_points=viz_corner_points,
+        viz_all_points=viz_all_points,
     )
 
     # plt.show()
@@ -135,6 +244,8 @@ def visualize_datapoints(
     data_point: DataPoints,
     output_path: str,
     max_viz_images: int | None = None,
+    viz_corner_points: bool = True,
+    viz_all_points: bool = False,
 ):
     def _get_layout(num_images: int):
         known_layouts = [
@@ -175,7 +286,12 @@ def visualize_datapoints(
 
     for i in range(num_images):
         _visualize_single_helper(
-            axes[i], data_point.images[i], data_point.labels[i], data_point.board_pts[i]
+            axes[i],
+            data_point.images[i],
+            data_point.labels[i],
+            data_point.board_pts[i],
+            viz_corner_points,
+            viz_all_points,
         )
 
     for i in range(num_images, len(axes)):

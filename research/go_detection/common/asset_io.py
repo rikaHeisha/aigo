@@ -26,6 +26,12 @@ class AssetIO:
     def mkdir(self, rel_path: str = ""):
         os.makedirs(self._abs(rel_path), exist_ok=True)
 
+    def cd(self, rel_path: str):
+        if rel_path == "":
+            return self
+
+        return AssetIO(self._abs(rel_path))
+
     def ls(self, rel_path: str = "", only_file_name: bool = False) -> List[str]:
         dirs = os.listdir(self._abs(rel_path))
 

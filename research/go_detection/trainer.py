@@ -1,24 +1,28 @@
 import logging
 import os
+import sys
 import time
-from os import path
-from typing import Dict, Tuple, TypeVar, Union, cast
+from os import mkdir, path
+from typing import Dict, List, Tuple, TypeVar, Union, cast
 
 import numpy as np
 import torch
 from go_detection.common.asset_io import AssetIO
 from go_detection.config import DataCfg, SimCfg
 from go_detection.dataloader import (
+    DataPoint,
     DataPointPath,
     DataPoints,
     create_datasets,
     load_datasets,
     visualize_datapoints,
+    visualize_grid,
     visualize_single_datapoint,
 )
 from go_detection.model import GoModel
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -192,12 +196,69 @@ class GoTrainer:
         return parameters
 
     def evaluate(
-        self, path: str, render_corner_points: bool = True, render_labels: bool = True
+        self,
+        evaluate_path: str,
+        render_index: List[int],
+        overlay_corner: bool = True,
+        overlay_points: bool = True,
+        grid_label: bool = True,
     ):
-        pass  # TODO(rishi) do this tomorrow
+        self.model.eval()
+        # with torch.no_grad():
+
+        eval_io = self.results_io.cd(evaluate_path)
+        eval_io.mkdir("overlay_corner")
+        eval_io.mkdir("overlay_points")
+        eval_io.mkdir("grid_label")
+
+        indices = render_index or list(range(len(self.test_dataloader.dataset)))
+
+        # TODO(rishi): Use the dataloader instead of directly accessing the dataset. For this, we need to get rid of the render_index parameter and find a better config that the user can set
+        # Actually a great way of doing this will be to iterate through the whole dataset and selectively rendering. This is a good idea since we anyway have to iterate through the entire thing
+        for idx in tqdm(indices, desc=f"Rendering for iter {self.iter}"):
+            data_point = cast(DataPoint, self.test_dataloader.dataset[idx])
+            data_points = DataPoints(
+                data_point.image.unsqueeze(0).cuda(),
+                data_point.label.unsqueeze(0).cuda(),
+                data_point.board_pt.unsqueeze(0).cuda(),
+            )
+
+            output = self.model(data_points.images)
+            (_, predicted_label) = output[0].max(dim=0)
+            predicted_label = predicted_label.reshape(data_points.labels[0].shape)
+
+            if overlay_corner:
+                img_path = eval_io.get_abs(
+                    path.join("overlay_corner", f"image_{idx:04}.png"),
+                )
+                visualize_single_datapoint(data_points, img_path, 0, True, False)
+
+            if overlay_points:
+                img_path = eval_io.get_abs(
+                    path.join("overlay_points", f"image_{idx:04}.png"),
+                )
+                visualize_single_datapoint(data_points, img_path, 0, False, True)
+
+            if grid_label:
+                img_path = eval_io.get_abs(
+                    path.join("grid_label", f"image_{idx:04}.png"),
+                )
+                visualize_grid(data_points, img_path, 0, predicted_label)
+
+        self.train_dataloader
 
     def start(self):
         logging.info("Starting training")
+
+        self.evaluate(
+            path.join("results", f"iter_{self.iter:05}"),
+            self.cfg.result_cfg.eval_cfg.render_index,
+            self.cfg.result_cfg.eval_cfg.overlay_corner,
+            self.cfg.result_cfg.eval_cfg.overlay_points,
+            self.cfg.result_cfg.eval_cfg.grid_label,
+        )
+
+        sys.exit(0)
 
         while self.iter <= self.cfg.iters:
             output_map = self.train_step()
@@ -219,6 +280,17 @@ class GoTrainer:
             if self.iter % self.cfg.i_eval == 0:
                 logger.info("Starting evaluation")
 
+                evaluate_path = path.join("results", f"iter_{self.iter:05}")
+
+                eval_cfg = self.cfg.result_cfg.eval_cfg
+                self.evaluate(
+                    evaluate_path,
+                    eval_cfg.render_index,
+                    eval_cfg.overlay_corner,
+                    eval_cfg.overlay_points,
+                    eval_cfg.grid_label,
+                )
+
             self.iter += 1
 
         logging.info("Finished training")
@@ -235,6 +307,7 @@ class GoTrainer:
 
             num_images = datapoints.images.shape[0]
 
+            # TODO(rishi): change this to DataPoints.cuda()
             datapoints = DataPoints(
                 datapoints[0].cuda(),
                 datapoints[1].cuda(),
