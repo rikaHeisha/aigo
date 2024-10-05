@@ -14,6 +14,7 @@ from go_detection.config import DataCfg
 from matplotlib import pyplot as plt
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset, Sampler
+from torchvision.transforms.functional import crop
 from tqdm import tqdm
 
 
@@ -134,12 +135,75 @@ def _read_image(data_io: AssetIO, image_path: str, board_metadata):
         - resized image
         - original (width x height) before resizing
     """
-    image_tensor = data_io.load_image(image_path)
+    orig_image = data_io.load_image(image_path)
+    _, height, width = orig_image.shape
+    original_size = torch.tensor([width, height])
     new_size = (1024, 1024)  # Specify the new size (height, width)
-    resize = transforms.Resize(new_size)
-    resized_tensor = resize(image_tensor)
 
-    original_size = torch.tensor([image_tensor.shape[2], image_tensor.shape[1]])
+    if width == height:
+        resize_transform = transforms.Resize(new_size)
+        resized_tensor = resize_transform(orig_image)
+        return resized_tensor, original_size
+
+    assert "pts_clicks" in board_metadata
+    board_pts = torch.tensor(board_metadata.pts_clicks).double()
+    center_board = board_pts.mean(dim=0)
+
+    center_square = center_board
+    square_half_length = min(width, height) / 2
+
+    if width > height:
+        center_square[1] = height / 2
+    else:
+        assert width < height
+        center_square[0] = width / 2
+
+    assert (center_square == center_board).all(), "I expect this assert to fail"
+
+    # Check if all corner points are within the crop square (center_square)
+    def _check_inside_square(top_left_point, square_length, test_pt):
+        return top_left_point[0] < test_pt[0] < (
+            top_left_point[0] + square_length
+        ) and top_left_point[1] < test_pt[1] < (top_left_point[1] + square_length)
+
+    top_left_point = torch.tensor(
+        [
+            center_square[0] - square_half_length,
+            center_square[1] - square_half_length,
+        ]
+    )
+    all_points_are_inside = all(
+        [
+            _check_inside_square(top_left_point, square_half_length * 2, pt)
+            for pt in board_pts
+        ]
+    )
+
+    if all_points_are_inside:
+        # crop and resize
+        cropped_image = crop(
+            orig_image,
+            int(center_square[1] - square_half_length),
+            int(center_square[0] - square_half_length),
+            int(2 * square_half_length),
+            int(2 * square_half_length),
+        )
+
+        intermediate_image = cropped_image
+
+    else:
+        # Pad the images with black and then resize
+        pad_amount = int(abs(width - height) / 2)
+        padding = (0, pad_amount) if width > height else (pad_amount, 0)
+
+        pad_transform = transforms.Pad(padding, 0, "constant")
+        # pad_transform = transforms.Pad(padding, 0, "edge")
+
+        padded_image = pad_transform(orig_image)
+        intermediate_image = padded_image
+
+    resize_transform = transforms.Resize(new_size)
+    resized_tensor = resize_transform(intermediate_image)
     return resized_tensor, original_size
 
 
