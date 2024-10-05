@@ -121,6 +121,7 @@ class AssetIO:
         return image_tensor
 
     def save_image(self, rel_path: str, image: torch.Tensor):
+        """Image should have a shape of C x H x W where the channels are RGBA / RGB / LA"""
         transform = transforms.ToPILImage()
         pil_img = transform(image)
         pil_img.save(self._abs(rel_path))
