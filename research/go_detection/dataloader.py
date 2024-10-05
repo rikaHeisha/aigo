@@ -32,14 +32,14 @@ class DataPoint:
     board_pt: torch.Tensor
 
     def cpu(self):
-        return DataPoints(
+        return DataPoint(
             self.image.cpu(),
             self.label.cpu(),
             self.board_pt.cpu(),
         )
 
     def cuda(self):
-        return DataPoints(
+        return DataPoint(
             self.image.cuda(),
             self.label.cuda(),
             self.board_pt.cuda(),
@@ -312,7 +312,8 @@ class GoDataset(Dataset):
         return len(self.labels)
 
     def __getitem__(self, idx) -> DataPoint:
-        return DataPoint(self.images[idx], self.labels[idx], self.board_pts[idx])
+        data_point = DataPoint(self.images[idx], self.labels[idx], self.board_pts[idx])
+        return data_point.cuda()
 
 
 class GoDynamicDataset(Dataset):
@@ -333,7 +334,7 @@ class GoDynamicDataset(Dataset):
 
     def __getitem__(self, idx) -> DataPoint:
         data_point = _load_single(self.datapoint_paths[idx], self.data_io)
-        return data_point
+        return data_point.cuda()
 
 
 def load_datasets(

@@ -3,6 +3,7 @@ import os
 import sys
 import time
 from collections import defaultdict
+from dataclasses import dataclass
 from os import mkdir, path
 from typing import Dict, List, Tuple, TypeVar, Union, cast
 
@@ -27,8 +28,30 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-MetricPrimitive = Union[float, torch.Tensor, int]
-MetricValue = Union[MetricPrimitive, Tuple[MetricPrimitive, float]]
+
+@dataclass
+class MetricValue:
+    _base_value: Union[float, torch.Tensor, int]
+    _weight: float | None = (
+        None  # Losses are also stored as metrics and they have a weight associated with it
+    )
+
+    def has_weight(self):
+        return self._weight is not None
+
+    @property
+    def weighted_value(self):
+        if self._weight is None:
+            return self._base_value
+        else:
+            return self._base_value * self._weight
+
+    @property
+    def base_value(self):
+        if isinstance(self._base_value, torch.Tensor):
+            return self._base_value
+        else:
+            return torch.tensor(self._base_value)
 
 
 # For debugging
@@ -152,13 +175,19 @@ class GoTrainer:
         for key, metric in map_metrics.items():
             metric_name = f"{prefix}{key}"
 
-            if isinstance(metric, MetricPrimitive):
-                self.tf_writer.add_scalar(metric_name, metric, step, metric_time)
-            else:
-                assert isinstance(metric, tuple)
-                self.tf_writer.add_scalar(metric_name, metric[0], step, metric_time)
+            if not metric.has_weight():
                 self.tf_writer.add_scalar(
-                    f"{metric_name}_weighted", metric[0] * metric[1], step, metric_time
+                    metric_name, metric.base_value, step, metric_time
+                )
+            else:
+                self.tf_writer.add_scalar(
+                    metric_name, metric.base_value, step, metric_time
+                )
+                self.tf_writer.add_scalar(
+                    f"{metric_name}_weighted",
+                    metric.weighted_value,
+                    step,
+                    metric_time,
                 )
 
         # TODO(rishi): See if this is necessary or not
@@ -202,9 +231,6 @@ class GoTrainer:
         render_index: List[int],
         render_grid: bool = True,
     ):
-        self.model.eval()
-        # with torch.no_grad():
-
         eval_io = self.results_io.cd(evaluate_path)
         eval_io.mkdir("render_grid")
 
@@ -217,46 +243,47 @@ class GoTrainer:
         datapoint_paths = cast(
             GoDynamicDataset | GoDataset, self.test_dataloader.dataset
         ).datapoint_paths
-        # TODO(rishi) support multiple images at once
-        for idx in tqdm(indices, desc=f"Rendering for iter {self.iter}"):
-            data_point = cast(DataPoint, self.test_dataloader.dataset[idx])
-            data_points = data_point.to_data_points().cuda()
 
-            output = self.model(data_points.images)
+        self.model.eval()
+        with torch.no_grad():
+            # TODO(rishi) support multiple images at once
+            for idx in tqdm(indices, desc=f"Rendering for iter {self.iter}"):
+                data_point = cast(DataPoint, self.test_dataloader.dataset[idx])
+                data_points = data_point.to_data_points().cuda()
 
-            (_, predicted_label) = output[0].max(dim=0)
-            predicted_label = predicted_label.reshape(data_points.labels[0].shape)
-            gt_label = data_points.labels[0]
+                output = self.model(data_points.images)
 
-            num_correct = (gt_label == predicted_label).sum().item()
-            num_incorrect = (gt_label != predicted_label).sum().item()
+                (_, predicted_label) = output[0].max(dim=0)
+                predicted_label = predicted_label.reshape(data_points.labels[0].shape)
+                gt_label = data_points.labels[0]
 
-            image_name = f"image_{idx:04}"
-            if render_grid:
-                img_path = eval_io.get_abs(
-                    path.join("render_grid", f"{image_name}.png"),
-                )
-                visualize_grid(data_points, img_path, 0, predicted_label)
+                num_correct = (gt_label == predicted_label).sum().item()
+                num_incorrect = (gt_label != predicted_label).sum().item()
 
-            # Append this image to the report.yaml
-            report_data[image_name] = {}
-            report_data[image_name]["path"] = datapoint_paths[idx].image_path
-            report_data[image_name]["num_correct"] = num_correct
-            report_data[image_name]["num_incorrect"] = num_incorrect
+                image_name = f"image_{idx:04}"
+                if render_grid:
+                    img_path = eval_io.get_abs(
+                        path.join("render_grid", f"{image_name}.png"),
+                    )
+                    visualize_grid(data_points, img_path, 0, predicted_label)
 
-        eval_io.save_yaml("report.yaml", report_data)
+                # Append this image to the report.yaml
+                report_data[image_name] = {}
+                report_data[image_name]["path"] = datapoint_paths[idx].image_path
+                report_data[image_name]["num_correct"] = num_correct
+                report_data[image_name]["num_incorrect"] = num_incorrect
 
-        self.train_dataloader
+            eval_io.save_yaml("report.yaml", report_data)
 
     def start(self):
         # logging.info("Starting training")
 
-        self.evaluate(
-            path.join("results", f"iter_{self.iter:05}"),
-            self.cfg.result_cfg.eval_cfg.render_index,
-            self.cfg.result_cfg.eval_cfg.render_grid,
-        )
-        sys.exit(0)
+        # self.evaluate(
+        #     path.join("results", f"iter_{self.iter:05}"),
+        #     self.cfg.result_cfg.eval_cfg.render_index,
+        #     self.cfg.result_cfg.eval_cfg.render_grid,
+        # )
+        # sys.exit(0)
 
         # dataset = cast(GoDynamicDataset | GoDataset, self.train_dataloader.dataset)
         # for idx in range(len(dataset)):
@@ -264,15 +291,17 @@ class GoTrainer:
         #     logger.info(
         #         f"Loading image: {idx}, path: {dataset.datapoint_paths[idx].image_path}"
         #     )
-
         # sys.exit(0)
 
         while self.iter <= self.cfg.iters:
             output_map = self.train_step()
 
+            eval_output_map = self.eval_step()
+            self._upload_metrics_to_tf(self.iter, eval_output_map, "test__")
+
             if self.iter % self.cfg.i_print == 0:
                 logger.info(
-                    f'Exp: {self.cfg.result_cfg.name}, Iter: {self.iter} / {self.cfg.iters}, Memory: {output_map["memory"]: .2f} GB, total_loss: {output_map["total_loss"]:.4f}'
+                    f'Exp: {self.cfg.result_cfg.name}, Iter: {self.iter} / {self.cfg.iters}, Memory: {output_map["memory"].base_value: .2f} GB, total_loss: {output_map["total_loss"].base_value:.4f}'
                 )
 
             if self.iter % self.cfg.i_weight == 0:
@@ -301,63 +330,96 @@ class GoTrainer:
         logging.info("Finished training")
         self.tf_writer.flush()
 
+    def _calculate_metrics(self, datapoints, model_output):
+        map_metrics: Dict[str, MetricValue] = {}
+
+        num_images = datapoints.images.shape[0]
+        gt_labels = datapoints.labels.reshape(num_images, -1)
+
+        # Check that the shape matches what we are giving to self.nll_loss
+        assert (
+            gt_labels.shape[1:] == model_output.shape[2:]
+            and gt_labels.shape[0] == num_images
+            and model_output.shape[0] == num_images
+        )
+        assert gt_labels.max() < model_output.shape[1] and gt_labels.min() >= 0
+        nll_loss = self.nll_loss(model_output, gt_labels)
+        # Manuall calculate the NLL loss for verifying
+        # target_label_one_hot = torch.nn.functional.one_hot(gt_labels, model_output.shape[1])
+        # nll_loss_2 = (-model_output * target_label_one_hot.transpose(1,2)).sum(dim=1).mean()
+        map_metrics["nll_loss"] = MetricValue(nll_loss, 1.0)
+
+        # We have finished calculating all the losses. Calculate total loss now
+        total_loss = torch.tensor(0.0).cuda()
+        for metric_name, metric in map_metrics.items():
+            if "loss" in metric_name:
+                total_loss = total_loss + metric.weighted_value
+
+        map_metrics["total_loss"] = MetricValue(total_loss)
+
+        memory_gb = torch.cuda.max_memory_allocated() / 1024**3
+        map_metrics["memory"] = MetricValue(memory_gb)
+
+        return map_metrics
+
     def train_step(self):
         # Iterate through all the training datasets
-        output_map: Dict[str, MetricValue] = {}
+        map_metrics: Dict[str, MetricValue] = {}
         self.model.train()
+        self.optimizer.zero_grad(set_to_none=True)
 
         for idx, datapoints in enumerate(self.train_dataloader, 1):
-            # Reset output map every iteration
-            output_map = {}
-
-            num_images = datapoints.images.shape[0]
-
-            datapoints = datapoints.cuda()
-            output = self.model(datapoints.images)
-            gt_labels = datapoints.labels.reshape(num_images, -1)
-
-            # Check that the shape matches what we are giving to self.nll_loss
-            assert (
-                gt_labels.shape[1:] == output.shape[2:]
-                and gt_labels.shape[0] == num_images
-                and output.shape[0] == num_images
-            )
-            assert gt_labels.max() < output.shape[1] and gt_labels.min() >= 0
-            nll_loss = self.nll_loss(output, gt_labels)
-
-            # Manuall calculate the NLL loss
-            # target_label_one_hot = torch.nn.functional.one_hot(gt_labels, output.shape[1])
-            # nll_loss_2 = (-output * target_label_one_hot.transpose(1,2)).sum(dim=1).mean()
-
-            output_map["nll_loss"] = (nll_loss, 100.0)
-
-            #########################
-            # Calculate total loss
-            #########################
-            total_loss = torch.tensor(0.0).cuda()
-            for key, value in output_map.items():
-                if "loss" in key:
-                    assert isinstance(value, tuple)
-                    total_loss = total_loss + value[0] * value[1]
-
-            output_map["total_loss"] = total_loss
-
-            memory_gb = torch.cuda.max_memory_allocated() / 1024**3
-            output_map["memory"] = memory_gb
+            datapoints = cast(DataPoints, datapoints)
+            model_output = self.model(datapoints.images)
+            map_metrics = self._calculate_metrics(datapoints, model_output)
 
             # Use print so this does not end up in the logs
             print(
-                f"Exp: {self.cfg.result_cfg.name}, Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {memory_gb: .2f} GB, total_loss: {total_loss:.4f}"
+                f'Exp: {self.cfg.result_cfg.name}, Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"].base_value: .2f} GB, total_loss: {map_metrics["total_loss"].base_value:.4f}'
             )
 
             mini_batch_idx = (self.iter - 1) * len(self.train_dataloader) + idx
             self._upload_metrics_to_tf(
-                mini_batch_idx, output_map, "step__"
+                mini_batch_idx, map_metrics, "step__"
             )  # TODO(rishi): add a config for this so we dont push every tick?
 
             self.optimizer.zero_grad(set_to_none=True)
-            total_loss.backward()
+            map_metrics["total_loss"].base_value.backward()
             self.optimizer.step()
 
+            break
+
         # Completed one epoch
-        return output_map
+        return map_metrics
+
+    def eval_step(self):
+        """Calculate the test loss"""
+        aggregated_map_metrics: Dict[str, List[MetricValue]] = defaultdict(list)
+        self.model.eval()
+        self.optimizer.zero_grad(set_to_none=True)
+
+        with torch.no_grad():
+            for idx, datapoints in enumerate(self.test_dataloader, 1):
+                datapoints = cast(DataPoints, datapoints)
+                model_output = self.model(datapoints.images)
+                map_metrics = self._calculate_metrics(datapoints, model_output)
+
+                for matric_name, metric in map_metrics.items():
+                    aggregated_map_metrics[matric_name].append(metric)
+
+                print(
+                    f'Eval Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"].base_value: .2f} GB, total_loss: {map_metrics["total_loss"].base_value:.4f}'
+                )
+
+                if idx >= 0:
+                    break
+
+            map_metrics: Dict[str, MetricValue] = {}
+            for metric_name, list_metrics in aggregated_map_metrics.items():
+                if metric_name in ["total_loss"]:
+                    list_values = [_.base_value for _ in list_metrics]
+                    map_metrics[metric_name] = MetricValue(
+                        torch.stack(list_values, dim=0).mean()
+                    )
+
+            return map_metrics
