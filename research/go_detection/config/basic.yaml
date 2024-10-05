@@ -26,6 +26,6 @@ result_cfg:
 
     render_index:
       - 0
-      # - 1
-      # - 2
-      # - 3
+      - 1
+      - 2
+      - 3

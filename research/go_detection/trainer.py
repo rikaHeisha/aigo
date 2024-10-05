@@ -251,17 +251,21 @@ class GoTrainer:
     def start(self):
         # logging.info("Starting training")
 
-        # self.evaluate(
-        #     path.join("results", f"iter_{self.iter:05}"),
-        #     self.cfg.result_cfg.eval_cfg.render_index,
-        #     self.cfg.result_cfg.eval_cfg.render_grid,
-        # )
-        # sys.exit(0)
-
-        data_point = cast(DataPoint, self.test_dataloader.dataset[0])
-        asset_io = AssetIO("/home/rmenon/Desktop/dev/projects/aigo/research")
-        asset_io.save_image("rishi.png", data_point.image)
+        self.evaluate(
+            path.join("results", f"iter_{self.iter:05}"),
+            self.cfg.result_cfg.eval_cfg.render_index,
+            self.cfg.result_cfg.eval_cfg.render_grid,
+        )
         sys.exit(0)
+
+        # dataset = cast(GoDynamicDataset | GoDataset, self.train_dataloader.dataset)
+        # for idx in range(len(dataset)):
+        #     data_point = cast(DataPoint, dataset[idx])
+        #     logger.info(
+        #         f"Loading image: {idx}, path: {dataset.datapoint_paths[idx].image_path}"
+        #     )
+
+        # sys.exit(0)
 
         while self.iter <= self.cfg.iters:
             output_map = self.train_step()

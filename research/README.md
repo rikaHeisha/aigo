@@ -5,9 +5,10 @@
 First download all pip packages:
 ```
 pip install hydra-core --upgrade
-pip install torch numpy fire matplotlib plotly
+pip install fire matplotlib plotly kaleido snakeviz
+
+pip install torch numpy
 pip install ai_edge_torch
-pip install -U kaleido
 
 ```
 

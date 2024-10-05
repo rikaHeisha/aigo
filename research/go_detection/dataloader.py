@@ -146,65 +146,89 @@ def _read_image(data_io: AssetIO, image_path: str, board_metadata):
         return resized_tensor, original_size
 
     assert "pts_clicks" in board_metadata
-    board_pts = torch.tensor(board_metadata.pts_clicks).double()
-    center_board = board_pts.mean(dim=0)
+    board_pts = torch.tensor(board_metadata.pts_clicks).float()
 
-    center_square = center_board
-    square_half_length = min(width, height) / 2
-
+    center_square = board_pts.mean(dim=0)
+    # square_half_length will perfectly keep one dimension. If width is larger, then square_half_length will be half_height of image.
+    square_half_length = torch.tensor(min(width, height) / 2).float().ceil()
     if width > height:
         center_square[1] = height / 2
     else:
         assert width < height
         center_square[0] = width / 2
 
-    assert (center_square == center_board).all(), "I expect this assert to fail"
-
-    # Check if all corner points are within the crop square (center_square)
-    def _check_inside_square(top_left_point, square_length, test_pt):
-        return top_left_point[0] < test_pt[0] < (
-            top_left_point[0] + square_length
-        ) and top_left_point[1] < test_pt[1] < (top_left_point[1] + square_length)
-
-    top_left_point = torch.tensor(
-        [
-            center_square[0] - square_half_length,
-            center_square[1] - square_half_length,
-        ]
-    )
     all_points_are_inside = all(
         [
-            _check_inside_square(top_left_point, square_half_length * 2, pt)
-            for pt in board_pts
+            ((board_pts - (center_square - square_half_length)) >= 0.0).all(),
+            ((board_pts - (center_square + square_half_length)) <= 0.0).all(),
         ]
     )
 
-    if all_points_are_inside:
-        # crop and resize
-        cropped_image = crop(
-            orig_image,
-            int(center_square[1] - square_half_length),
-            int(center_square[0] - square_half_length),
-            int(2 * square_half_length),
-            int(2 * square_half_length),
-        )
+    if not all_points_are_inside:
+        # increase square_half_length a small amount until the board perfectly fits in
 
-        intermediate_image = cropped_image
+        required_half_length = (board_pts - center_square).abs().max().ceil()
+        assert (
+            min(width, height) < 2 * required_half_length < max(width, height)
+        ), f"The required length cannot be bigger than both width and height. We expect it to only be bigger than one of them"
 
+        # Check that all the points are inside this bigger region
+        assert all(
+            [
+                ((board_pts - (center_square - required_half_length)) >= 0.0).all(),
+                ((board_pts - (center_square + required_half_length)) <= 0.0).all(),
+            ]
+        ), "Expected all the board points to be inside the square after increasing square_half_length"
+
+        load_mode = 1
+        if load_mode == 0:
+            # In this mode, we do not want aspect ratio to change at all. This mode starts with the best fit square, and expands it in BOTH dimension till it fits all the points. This will cause some black padding to appear. Then we can further expand it using the extra_expand parameter. A higher value will cause more black padding, but will also increase the amount of background infomation in the image
+            extra_expand = 60
+            rectangle_half_length = torch.tensor(
+                [required_half_length, required_half_length]
+            )
+            rectangle_half_length = rectangle_half_length + extra_expand
+
+        elif load_mode == 1:
+            # In this mode, we do not want any black padding at all. This mode starts with the best fit square, and expands it in ONE dimension till it fits all the points. Then we can furthur expand it using extra_expand parameter. A higher value will increase the amount of background info in the image. Once we crop the rectangular region, it gets resized to a square, so this mode does not preserve the aspect ratio
+            extra_expand = 60
+            rectangle_half_length = (
+                [required_half_length + extra_expand, square_half_length]
+                if width > height
+                else [square_half_length, required_half_length + extra_expand]
+            )
+            rectangle_half_length = torch.tensor(rectangle_half_length)
+
+        else:
+            assert False, f"Unknown load mode: {load_mode}"
     else:
-        # Pad the images with black and then resize
-        pad_amount = int(abs(width - height) / 2)
-        padding = (0, pad_amount) if width > height else (pad_amount, 0)
+        # only need to crop
+        rectangle_half_length = torch.tensor([square_half_length, square_half_length])
 
-        pad_transform = transforms.Pad(padding, 0, "constant")
-        # pad_transform = transforms.Pad(padding, 0, "edge")
-
-        padded_image = pad_transform(orig_image)
-        intermediate_image = padded_image
+    # Check that all the points fit inside the crop region
+    all(
+        [
+            ((board_pts - (center_square - rectangle_half_length)) >= 0.0).all(),
+            ((board_pts - (center_square + rectangle_half_length)) <= 0.0).all(),
+        ]
+    ), "Expected all the board points to be inside the rectangular crop region"
+    intermediate_image = crop(
+        orig_image,
+        int(center_square[1] - rectangle_half_length[1]),
+        int(center_square[0] - rectangle_half_length[0]),
+        int(2 * rectangle_half_length[1]),
+        int(2 * rectangle_half_length[0]),
+    )
 
     resize_transform = transforms.Resize(new_size)
-    resized_tensor = resize_transform(intermediate_image)
-    return resized_tensor, original_size
+    resized_image = resize_transform(intermediate_image)
+
+    # asset_io = AssetIO("/home/rmenon/Desktop/dev/projects/aigo/research")
+    # asset_io.save_image("rishi_orig.png", orig_image)
+    # asset_io.save_image("rishi_intermediate.png", intermediate_image)
+    # asset_io.save_image("rishi_final.png", resized_image)
+
+    return resized_image, original_size
 
 
 def _read_label(data_io: AssetIO, label_path: str):
