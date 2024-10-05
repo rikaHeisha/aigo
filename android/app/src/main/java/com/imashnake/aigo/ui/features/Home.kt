@@ -1,6 +1,7 @@
 package com.imashnake.aigo.ui.features
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.imashnake.aigo.R
@@ -12,7 +13,7 @@ fun Home(
     modifier: Modifier = Modifier,
     onCameraRequested: () -> Unit,
 ) {
-    Column(modifier) {
+    Column(modifier.fillMaxSize()) {
         AigoIconTextButton(
             drawable = R.drawable.photo_camera,
             text = "Take Picture",
