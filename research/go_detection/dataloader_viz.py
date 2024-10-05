@@ -19,11 +19,15 @@ def _label_to_color(lab):
         return "white"
 
 
-def _draw_board(axis, board_grid_pt):
+def _draw_board(axis, board_grid_pt, grid_dim):
+    (grid_height, grid_width) = grid_dim
+
     colors = _label_to_color(1)
+
+    # Our origin is top left corner of the image / board. But matplotlib uses bottom left corner as origin. Hence we need to do (grid_height - 1) to convert the y value from our origin to matplotlib's origin
     axis.scatter(
-        (board_grid_pt[:, 0]) + 0.5,
-        (board_grid_pt[:, 1]) + 0.5,
+        (board_grid_pt[:, 0]),
+        (grid_height - 1) - (board_grid_pt[:, 1]),
         facecolors=colors,
         # edgecolors="#606060",
         # c=colors,
@@ -33,7 +37,8 @@ def _draw_board(axis, board_grid_pt):
     )
 
 
-def _draw_pieces(axis, grid_pt, label):
+def _draw_pieces(axis, grid_pt, label, grid_dim):
+    (grid_height, grid_width) = grid_dim
     label = label.reshape(-1)
     mask = (label != 1).nonzero().squeeze(1)
 
@@ -41,10 +46,11 @@ def _draw_pieces(axis, grid_pt, label):
     pieces_label = label[mask]
     assert (pieces_label != 1).all()
 
+    # Our origin is top left corner of the image / board. But matplotlib uses bottom left corner as origin. Hence we need to do (grid_height - 1) to convert the y value from our origin to matplotlib's origin
     pieces_colors = [_label_to_color(l) for l in pieces_label]
     axis.scatter(
         (pieces_grid_pt[:, 0]).int(),
-        (pieces_grid_pt[:, 1]).int(),
+        (grid_height - 1) - (pieces_grid_pt[:, 1]).int(),
         facecolors=pieces_colors,
         # edgecolors="#606060",
         # c=colors,
@@ -53,11 +59,14 @@ def _draw_pieces(axis, grid_pt, label):
     )
 
 
-def _draw_correct_incorrect(axis, grid_pt, label, predicted_label):
+def _draw_correct_incorrect(axis, grid_pt, label, predicted_label, grid_dim):
+    (grid_height, grid_width) = grid_dim
     colors = [("green" if l else "red") for l in (predicted_label == label).reshape(-1)]
+
+    # Our origin is top left corner of the image / board. But matplotlib uses bottom left corner as origin. Hence we need to do (grid_height - 1) to convert the y value from our origin to matplotlib's origin
     axis.scatter(
         (grid_pt[:, 0]).int(),
-        (grid_pt[:, 1]).int(),
+        (grid_height - 1) - (grid_pt[:, 1]).int(),
         facecolors=colors,
         # edgecolors="red",
         # c=colors,
@@ -86,8 +95,8 @@ def visualize_grid(
     meshgrid = torch.meshgrid(xs, ys, indexing="xy")
     grid_pt = torch.stack(meshgrid, dim=2).reshape(-1, 2)
 
-    xs = torch.arange(0, label.shape[0] - 1)
-    ys = torch.arange(0, label.shape[1] - 1)
+    xs = torch.arange(0, label.shape[0] - 1) + 0.5
+    ys = torch.arange(0, label.shape[1] - 1) + 0.5
     meshgrid = torch.meshgrid(xs, ys, indexing="xy")
     board_grid_pt = torch.stack(meshgrid, dim=2).reshape(-1, 2)
 
@@ -103,6 +112,8 @@ def visualize_grid(
     else:
         axes = [axes]
 
+    grid_dim = label.shape
+
     image = data_points.images[index]
     image = image.transpose(0, 1).transpose(1, 2)  # Convert CHW to HWC
     image = image.clamp(0.0, 1.0)
@@ -110,14 +121,14 @@ def visualize_grid(
     axes[0].imshow(image)
     # _draw_board(axes[0], board_grid_pt)
 
-    _draw_board(axes[1], board_grid_pt)
-    _draw_pieces(axes[1], grid_pt, label)
+    _draw_board(axes[1], board_grid_pt, grid_dim)
+    _draw_pieces(axes[1], grid_pt, label, grid_dim)
 
-    _draw_board(axes[2], board_grid_pt)
-    _draw_pieces(axes[2], grid_pt, predicted_label)
+    _draw_board(axes[2], board_grid_pt, grid_dim)
+    _draw_pieces(axes[2], grid_pt, predicted_label, grid_dim)
 
-    _draw_board(axes[3], board_grid_pt)
-    _draw_correct_incorrect(axes[3], grid_pt, label, predicted_label)
+    _draw_board(axes[3], board_grid_pt, grid_dim)
+    _draw_correct_incorrect(axes[3], grid_pt, label, predicted_label, grid_dim)
 
     axes[0].axis("off")
     axes[0].set_aspect("equal")
@@ -140,7 +151,7 @@ def visualize_grid(
     # axes[0].spines["bottom"].set_visible(False)  # Hide the bottom spine
 
     for axis in axes[1:]:
-        axis.set_facecolor("#222222")
+        axis.set_facecolor("#515151")
         axis.set_aspect("equal")
         axis.set_xlim(-0.5, 18.5)
         axis.set_ylim(-0.5, 18.5)
@@ -163,7 +174,7 @@ def visualize_grid(
     # sys.exit(0)
 
 
-def visualize_grid_pyplot(
+def visualize_grid_plotly(
     data_points: DataPoints,
     output_path: str,
     index: int,

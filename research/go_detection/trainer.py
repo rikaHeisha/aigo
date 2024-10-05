@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import time
+from collections import defaultdict
 from os import mkdir, path
 from typing import Dict, List, Tuple, TypeVar, Union, cast
 
@@ -13,6 +14,8 @@ from go_detection.dataloader import (
     DataPoint,
     DataPointPath,
     DataPoints,
+    GoDataset,
+    GoDynamicDataset,
     create_datasets,
     load_datasets,
 )
@@ -209,6 +212,12 @@ class GoTrainer:
 
         # TODO(rishi): Use the dataloader instead of directly accessing the dataset. For this, we need to get rid of the render_index parameter and find a better config that the user can set
         # Actually a great way of doing this will be to iterate through the whole dataset and selectively rendering. This is a good idea since we anyway have to iterate through the entire thing
+
+        report_data = {}
+        datapoint_paths = cast(
+            GoDynamicDataset | GoDataset, self.test_dataloader.dataset
+        ).datapoint_paths
+        # TODO(rishi) support multiple images at once
         for idx in tqdm(indices, desc=f"Rendering for iter {self.iter}"):
             data_point = cast(DataPoint, self.test_dataloader.dataset[idx])
             data_points = data_point.to_data_points().cuda()
@@ -217,12 +226,25 @@ class GoTrainer:
 
             (_, predicted_label) = output[0].max(dim=0)
             predicted_label = predicted_label.reshape(data_points.labels[0].shape)
+            gt_label = data_points.labels[0]
 
+            num_correct = (gt_label == predicted_label).sum().item()
+            num_incorrect = (gt_label != predicted_label).sum().item()
+
+            image_name = f"image_{idx:04}"
             if render_grid:
                 img_path = eval_io.get_abs(
-                    path.join("render_grid", f"image_{idx:04}.png"),
+                    path.join("render_grid", f"{image_name}.png"),
                 )
                 visualize_grid(data_points, img_path, 0, predicted_label)
+
+            # Append this image to the report.yaml
+            report_data[image_name] = {}
+            report_data[image_name]["path"] = datapoint_paths[idx].image_path
+            report_data[image_name]["num_correct"] = num_correct
+            report_data[image_name]["num_incorrect"] = num_incorrect
+
+        eval_io.save_yaml("report.yaml", report_data)
 
         self.train_dataloader
 

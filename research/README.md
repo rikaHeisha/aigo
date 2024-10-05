@@ -7,6 +7,8 @@ First download all pip packages:
 pip install hydra-core --upgrade
 pip install torch numpy fire matplotlib plotly
 pip install ai_edge_torch
+pip install -U kaleido
+
 ```
 
 Before training a model, you need to setup your shell environment. This only needs to be done once whenever you create a new shell. Run:
