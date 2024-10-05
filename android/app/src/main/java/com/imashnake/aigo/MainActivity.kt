@@ -41,7 +41,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 
     Box(
         modifier = modifier,
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         NavHost(navController, startDestination = Home) {
             composable<Home> {
