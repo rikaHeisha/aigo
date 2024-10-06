@@ -75,7 +75,6 @@ def _draw_correct_incorrect(axis, grid_pt, label, predicted_label, grid_dim):
     )
 
 
-# TODO(rishi): change to 2x2 grid, and add original image to this. Fix the y flipped issue. Use GridSpec for exact grid layout
 def visualize_grid(
     data_points: DataPoints,
     output_path: str,

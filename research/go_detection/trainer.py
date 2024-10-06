@@ -29,29 +29,38 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class MetricValue:
-    _base_value: Union[float, torch.Tensor, int]
-    _weight: float | None = (
-        None  # Losses are also stored as metrics and they have a weight associated with it
-    )
+    def __init__(
+        self, base_value: Union[float, torch.Tensor, int], weight: float | None = None
+    ):
+        if isinstance(base_value, torch.Tensor):
+            self.base_value = base_value
+        else:
+            self.base_value = torch.tensor(base_value)
+
+        self.weight = weight
 
     def has_weight(self):
-        return self._weight is not None
+        return self.weight is not None
 
     @property
     def weighted_value(self):
-        if self._weight is None:
-            return self._base_value
+        if self.weight is None:
+            return self.base_value
         else:
-            return self._base_value * self._weight
+            return self.base_value * self.weight
 
-    @property
-    def base_value(self):
-        if isinstance(self._base_value, torch.Tensor):
-            return self._base_value
+    def __str__(self):
+        return f"MetricValue:\n  base_value: {self.base_value}\n  weight: {self.weight or 'None'}"
+
+    def __repr__(self):
+        return f"MetricValue:\n  base_value: {self.base_value}\n  weight: {self.weight or 'None'}"
+
+    def __format__(self, spec):
+        if self.weight is None:
+            return f"{self.base_value:{spec}}"
         else:
-            return torch.tensor(self._base_value)
+            return f"({self.base_value:{spec}}, {self.weight:{spec}})"
 
 
 # For debugging
@@ -194,7 +203,7 @@ class GoTrainer:
         self.tf_writer.flush()
 
     def load_checkpoint(self):
-        # TODO(rishi) add a load config
+        # TODO(rishi) add a config for loading checkpoints
         if not self.results_io.has_file("checkpoint.pt"):
             return
 
@@ -296,12 +305,9 @@ class GoTrainer:
         while self.iter <= self.cfg.iters:
             output_map = self.train_step()
 
-            eval_output_map = self.eval_step()
-            self._upload_metrics_to_tf(self.iter, eval_output_map, "test__")
-
             if self.iter % self.cfg.i_print == 0:
                 logger.info(
-                    f'Exp: {self.cfg.result_cfg.name}, Iter: {self.iter} / {self.cfg.iters}, Memory: {output_map["memory"].base_value: .2f} GB, total_loss: {output_map["total_loss"].base_value:.4f}'
+                    f'Exp: {self.cfg.result_cfg.name}, Iter: {self.iter} / {self.cfg.iters}, Memory: {output_map["memory"]:.2f} GB, total_loss: {output_map["total_loss"]:.4f}'
                 )
 
             if self.iter % self.cfg.i_weight == 0:
@@ -312,6 +318,10 @@ class GoTrainer:
                 # Upload the output_map of the last mini batch
                 logger.info("Uploading epoch to tensorboard")
                 self._upload_metrics_to_tf(self.iter, output_map, "epoch__")
+
+                # Upload output map of eval
+                eval_output_map = self.eval_step()
+                self._upload_metrics_to_tf(self.iter, eval_output_map, "test__")
 
             if self.iter % self.cfg.i_eval == 0:
                 logger.info("Starting evaluation")
@@ -375,7 +385,7 @@ class GoTrainer:
 
             # Use print so this does not end up in the logs
             print(
-                f'Exp: {self.cfg.result_cfg.name}, Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"].base_value: .2f} GB, total_loss: {map_metrics["total_loss"].base_value:.4f}'
+                f'Exp: {self.cfg.result_cfg.name}, Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"]:.2f} GB, total_loss: {map_metrics["total_loss"]:.4f}'
             )
 
             mini_batch_idx = (self.iter - 1) * len(self.train_dataloader) + idx
@@ -408,7 +418,7 @@ class GoTrainer:
                     aggregated_map_metrics[matric_name].append(metric)
 
                 print(
-                    f'Eval Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"].base_value: .2f} GB, total_loss: {map_metrics["total_loss"].base_value:.4f}'
+                    f'Eval Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"]:.2f} GB, total_loss: {map_metrics["total_loss"]:.4f}'
                 )
 
                 if idx >= 0:
