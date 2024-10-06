@@ -5,7 +5,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from os import mkdir, path
-from typing import Dict, List, Tuple, TypeVar, Union, cast
+from typing import Dict, List, Optional, Tuple, TypeVar, Union, cast
 
 import numpy as np
 import torch
@@ -234,17 +234,41 @@ class GoTrainer:
         parameters = self.model.parameters()
         return parameters
 
+    def _convert_render_dir_to_indices(
+        self,
+        datapoint_paths: List[DataPointPath],
+        render_dirs: List[int],
+        images_per_dir: Optional[int],
+    ):
+        map_dir_name_to_indexes = defaultdict(list)
+        for idx, datapoint_path in enumerate(datapoint_paths):
+            dir_name = datapoint_path.image_path.split("/", 1)[0]
+            map_dir_name_to_indexes[dir_name].append(idx)
+
+        list_dirs = [
+            dir_name
+            for idx, dir_name in enumerate(map_dir_name_to_indexes.keys())
+            if render_dirs == [] or idx in render_dirs
+        ]
+        [map_dir_name_to_indexes[dir_name] for dir_name in list_dirs]
+        indices = []
+        for dir_name in list_dirs:
+            indices.extend(map_dir_name_to_indexes[dir_name][:images_per_dir])
+
+        return indices
+
     def evaluate(
         self,
         evaluate_path: str,
-        render_index: List[int],
+        render_dirs: List[int],
+        images_per_dir: Optional[int],
         render_grid: bool = True,
     ):
         eval_io = self.results_io.cd(evaluate_path)
         eval_io.mkdir("render_grid")
 
-        indices = render_index or list(range(len(self.test_dataloader.dataset)))
-        indices = [_ for _ in indices if _ < len(self.test_dataloader.dataset)]
+        # indices = render_index or list(range(len(self.test_dataloader.dataset)))
+        # indices = [_ for _ in indices if _ < len(self.test_dataloader.dataset)]
 
         # TODO(rishi): Use the dataloader instead of directly accessing the dataset. For this, we need to get rid of the render_index parameter and find a better config that the user can set
         # Actually a great way of doing this will be to iterate through the whole dataset and selectively rendering. This is a good idea since we anyway have to iterate through the entire thing
@@ -254,11 +278,18 @@ class GoTrainer:
             GoDynamicDataset | GoDataset, self.test_dataloader.dataset
         ).datapoint_paths
 
+        # Convert render_dirs and images_per_dir to a list of indices
+        indices = self._convert_render_dir_to_indices(
+            datapoint_paths, render_dirs, images_per_dir
+        )
+
         self.model.eval()
         with torch.no_grad():
             # TODO(rishi) support multiple images at once
             list_accuracy = []
             for idx in tqdm(indices, desc=f"Rendering for iter {self.iter}"):
+                assert idx < len(self.test_dataloader.dataset)
+
                 data_point = cast(DataPoint, self.test_dataloader.dataset[idx])
                 data_points = data_point.to_data_points().cuda()
 
@@ -288,7 +319,8 @@ class GoTrainer:
                 report_data[image_name]["num_incorrect"] = num_incorrect
                 report_data[image_name]["accuracy"] = f"{100 * accuracy:.4f} %"
 
-            report_data["Overall"][
+            report_data["overall"] = {}
+            report_data["overall"][
                 "accuracy"
             ] = f"{100 * sum(list_accuracy) / len(list_accuracy):.4f} %"
             eval_io.save_yaml("report.yaml", report_data)
@@ -338,7 +370,8 @@ class GoTrainer:
                 eval_cfg = self.cfg.result_cfg.eval_cfg
                 self.evaluate(
                     evaluate_path,
-                    eval_cfg.render_index,
+                    eval_cfg.render_dirs,
+                    eval_cfg.images_per_dir,
                     eval_cfg.render_grid,
                 )
 
@@ -403,6 +436,8 @@ class GoTrainer:
             self.optimizer.zero_grad(set_to_none=True)
             map_metrics["total_loss"].base_value.backward()
             self.optimizer.step()
+
+            break
 
         # Completed one epoch
         return map_metrics

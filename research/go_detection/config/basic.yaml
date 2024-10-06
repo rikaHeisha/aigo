@@ -24,13 +24,5 @@ result_cfg:
   eval_cfg:
     render_grid: True
 
-    render_index:
-      - 0
-      - 1
-      - 2
-      - 110
-      - 111
-      - 112
-      - 150
-      - 151
-      - 152
+    images_per_dir: 3
+    render_dirs: [0, 1, 2, 3]

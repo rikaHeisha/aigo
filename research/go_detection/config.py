@@ -25,8 +25,8 @@ class DataCfg:
 class EvalCfg:
     render_grid: bool = True
 
-    # TODO(rishi): better way of defining these indices
-    render_index: List = field(default_factory=list)
+    images_per_dir: Optional[int] = None
+    render_dirs: List = field(default_factory=list)
 
     _target_: str = f"{__module__}.{__qualname__}"
 
