@@ -244,6 +244,7 @@ class GoTrainer:
         eval_io.mkdir("render_grid")
 
         indices = render_index or list(range(len(self.test_dataloader.dataset)))
+        indices = [_ for _ in indices if _ < len(self.test_dataloader.dataset)]
 
         # TODO(rishi): Use the dataloader instead of directly accessing the dataset. For this, we need to get rid of the render_index parameter and find a better config that the user can set
         # Actually a great way of doing this will be to iterate through the whole dataset and selectively rendering. This is a good idea since we anyway have to iterate through the entire thing
@@ -256,6 +257,7 @@ class GoTrainer:
         self.model.eval()
         with torch.no_grad():
             # TODO(rishi) support multiple images at once
+            list_accuracy = []
             for idx in tqdm(indices, desc=f"Rendering for iter {self.iter}"):
                 data_point = cast(DataPoint, self.test_dataloader.dataset[idx])
                 data_points = data_point.to_data_points().cuda()
@@ -277,11 +279,18 @@ class GoTrainer:
                     visualize_grid(data_points, img_path, 0, predicted_label)
 
                 # Append this image to the report.yaml
+                accuracy = num_correct / (num_correct + num_incorrect)
+                list_accuracy.append(accuracy)
+
                 report_data[image_name] = {}
                 report_data[image_name]["path"] = datapoint_paths[idx].image_path
                 report_data[image_name]["num_correct"] = num_correct
                 report_data[image_name]["num_incorrect"] = num_incorrect
+                report_data[image_name]["accuracy"] = f"{100 * accuracy:.4f} %"
 
+            report_data["Overall"][
+                "accuracy"
+            ] = f"{100 * sum(list_accuracy) / len(list_accuracy):.4f} %"
             eval_io.save_yaml("report.yaml", report_data)
 
     def start(self):
@@ -311,12 +320,10 @@ class GoTrainer:
                 )
 
             if self.iter % self.cfg.i_weight == 0:
-                logger.info("Starting saving checkpoint")
                 self.save_checkpoint()
 
             if self.iter % self.cfg.i_tf_writer == 0:
                 # Upload the output_map of the last mini batch
-                logger.info("Uploading epoch to tensorboard")
                 self._upload_metrics_to_tf(self.iter, output_map, "epoch__")
 
                 # Upload output map of eval
@@ -396,8 +403,6 @@ class GoTrainer:
             self.optimizer.zero_grad(set_to_none=True)
             map_metrics["total_loss"].base_value.backward()
             self.optimizer.step()
-
-            break
 
         # Completed one epoch
         return map_metrics

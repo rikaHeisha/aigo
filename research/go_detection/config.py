@@ -25,6 +25,7 @@ class DataCfg:
 class EvalCfg:
     render_grid: bool = True
 
+    # TODO(rishi): better way of defining these indices
     render_index: List = field(default_factory=list)
 
     _target_: str = f"{__module__}.{__qualname__}"
@@ -35,7 +36,9 @@ class ResultCfg:
     dir: str
     eval_cfg: EvalCfg
 
-    name: str = "${exp_name}"
+    name: str = (
+        "${exp_name}"  # TODO(rishi): redundant to store this infomation twice. Cleanup
+    )
     _target_: str = f"{__module__}.{__qualname__}"
 
     def get_asset_io(self) -> AssetIO:
