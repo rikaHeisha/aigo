@@ -12,8 +12,8 @@ import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.shouldShowRationale
 import com.imashnake.aigo.R
 
-private const val RATIONALE = "The app needs to see the Go board to digitize it\nplease grant camera permission"
-private const val REQUEST = "Camera permission is required for this feature"
+private const val RATIONALE = "The app needs to see the Go board to digitize it. Please grant camera permission."
+private const val REQUEST = "Camera permission is required for this feature."
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
