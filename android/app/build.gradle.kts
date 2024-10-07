@@ -52,6 +52,9 @@ dependencies {
     implementation(libs.compose.navigation)
     implementation(libs.accompanistPermissions)
     implementation(libs.kotlinx.serialization.core)
+    implementation(libs.camerax)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.camera.lifecycle)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
