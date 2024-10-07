@@ -11,11 +11,11 @@ i_print: 1
 
 data_cfg:
   base_path: /home/rmenon/Desktop/dev/datasets/go_board/dataset
-  train_split_percent: 0.8
+  train_split_percent: 0.9
   randomize_train_split: True
   use_dynamic_dataset: True
-  train_batch_size: 30
-  test_batch_size: 30
+  train_batch_size: 20
+  test_batch_size: 20
 
 model_cfg: {}
 

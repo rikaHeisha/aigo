@@ -451,7 +451,7 @@ class GoTrainer:
             map_metrics["total_loss"].base_value.backward()
             self.optimizer.step()
 
-            break
+            # break
 
         # Completed one epoch
         return map_metrics
