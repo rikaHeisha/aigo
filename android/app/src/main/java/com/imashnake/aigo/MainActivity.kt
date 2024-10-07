@@ -9,12 +9,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberPermissionState
 import com.imashnake.aigo.ui.features.CameraOverlay
+import com.imashnake.aigo.ui.features.CameraPermissionDialog
 import com.imashnake.aigo.ui.features.Home
 import com.imashnake.aigo.ui.theme.AigoTheme
 
@@ -35,21 +39,42 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MainScreen(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
+    val isDialogShown = remember { mutableStateOf(false) }
+    val cameraPermissionState = rememberPermissionState(
+        permission = android.Manifest.permission.CAMERA,
+        onPermissionResult = { granted ->
+            if (granted) {
+                navController.navigate(CameraOverlay)
+            } else {
+                isDialogShown.value = true
+            }
+        }
+    )
 
-    Box(
+    Box(modifier.fillMaxSize()) {
+        if (isDialogShown.value) {
+            CameraPermissionDialog(
+                permissionState = cameraPermissionState,
+                onDismiss = { isDialogShown.value = false },
+                launchRequest = cameraPermissionState::launchPermissionRequest,
+            )
+        }
+    }
+
+    NavHost(
+        navController = navController,
+        startDestination = Home,
         modifier = modifier,
-        contentAlignment = Alignment.Center,
     ) {
-        NavHost(navController, startDestination = Home) {
-            composable<Home> {
-                Home(onCameraRequested = { navController.navigate(CameraOverlay) })
-            }
-            composable<CameraOverlay> {
-                CameraOverlay()
-            }
+        composable<Home> {
+            Home(takePicture = cameraPermissionState::launchPermissionRequest)
+        }
+        composable<CameraOverlay> {
+            CameraOverlay()
         }
     }
 }
