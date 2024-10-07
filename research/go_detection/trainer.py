@@ -227,7 +227,7 @@ class GoTrainer:
         datapoint_paths: List[DataPointPath],
         render_dirs: List[int],
         images_per_dir: Optional[int],
-    ):
+    ) -> List[int]:
         map_dir_name_to_indexes = defaultdict(list)
         for idx, datapoint_path in enumerate(datapoint_paths):
             dir_name = datapoint_path.image_path.split("/", 1)[0]
@@ -245,8 +245,11 @@ class GoTrainer:
 
         return indices
 
-    def evaluate(
+    def _evaluate_dataset(
         self,
+        dataset: (
+            GoDynamicDataset | GoDataset
+        ),  # TODO(rishi): change this to dataloader?
         evaluate_path: str,
         render_dirs: List[int],
         images_per_dir: Optional[int],
@@ -259,9 +262,7 @@ class GoTrainer:
         # Actually a great way of doing this will be to iterate through the whole dataset and selectively rendering. This is a good idea since we anyway have to iterate through the entire thing
 
         report_data = {}
-        datapoint_paths = cast(
-            GoDynamicDataset | GoDataset, self.test_dataloader.dataset
-        ).datapoint_paths
+        datapoint_paths = cast(List[DataPointPath], dataset.datapoint_paths)
 
         # Convert render_dirs and images_per_dir to a list of indices
         indices = self._convert_render_dir_to_indices(
@@ -273,9 +274,11 @@ class GoTrainer:
             # TODO(rishi) support multiple images at once
             list_accuracy = []
             for idx in tqdm(indices, desc=f"Rendering for iter {self.iter}"):
-                assert idx < len(self.test_dataloader.dataset)
+                assert idx < len(
+                    dataset
+                ), f"Index {idx} outside length of dataset {len(dataset)}"
 
-                data_point = cast(DataPoint, self.test_dataloader.dataset[idx])
+                data_point = cast(DataPoint, dataset[idx])
                 data_points = data_point.to_data_points().cuda()
 
                 output = self.model(data_points.images)
@@ -309,6 +312,32 @@ class GoTrainer:
                 "accuracy"
             ] = f"{100 * sum(list_accuracy) / len(list_accuracy):.4f} %"
             eval_io.save_yaml("report.yaml", report_data)
+
+    def evaluate(
+        self,
+        evaluate_path: str,
+        render_dirs: List[int],
+        images_per_dir: Optional[int],
+        render_grid: bool = True,
+    ):
+        evaluate_train = True
+
+        if evaluate_train:
+            self._evaluate_dataset(
+                self.train_dataloader.dataset,
+                path.join(evaluate_path, "train"),
+                render_dirs=[0, 1, 2, 3],
+                images_per_dir=3,
+                render_grid=True,
+            )
+
+        self._evaluate_dataset(
+            self.test_dataloader.dataset,
+            path.join(evaluate_path, "test"),
+            render_dirs=render_dirs,
+            images_per_dir=images_per_dir,
+            render_grid=render_grid,
+        )
 
     def start(self):
         # logging.info("Starting training")
@@ -422,7 +451,7 @@ class GoTrainer:
             map_metrics["total_loss"].base_value.backward()
             self.optimizer.step()
 
-            # break
+            break
 
         # Completed one epoch
         return map_metrics
