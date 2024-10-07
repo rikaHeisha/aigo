@@ -1,26 +1,28 @@
 package com.imashnake.aigo.ui.features
 
 import android.content.Context
-import androidx.camera.camera2.interop.Camera2CameraControl
-import androidx.camera.camera2.interop.Camera2CameraInfo
-import androidx.camera.core.CameraControl
-import androidx.camera.core.CameraFilter
-import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
-import androidx.camera.core.impl.CameraFilters
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.imashnake.aigo.R
 import kotlinx.serialization.Serializable
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -44,7 +46,16 @@ fun CameraOverlay(modifier: Modifier = Modifier) {
             cameraProvider.bindToLifecycle(lifecycleOwner, cameraxSelector, preview)
             preview.surfaceProvider = previewView.surfaceProvider
         }
+
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+        Image(
+            imageVector = ImageVector.vectorResource(R.drawable.blank_go_board),
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(24.dp)
+                .graphicsLayer { alpha = 0.3f }
+        )
     }
 }
 
