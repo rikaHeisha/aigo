@@ -1,15 +1,16 @@
 package com.imashnake.aigo.ui.features
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.shouldShowRationale
-import com.imashnake.aigo.ui.components.AigoDialog
+import com.imashnake.aigo.R
 
 private const val RATIONALE = "The app needs to see the Go board to digitize it\nplease grant camera permission"
 private const val REQUEST = "Camera permission is required for this feature"
@@ -22,21 +23,34 @@ fun CameraPermissionDialog(
     launchRequest: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AigoDialog(onDismiss, modifier) {
-        Text(
-            if (permissionState.status.shouldShowRationale) {
-                RATIONALE
-            } else REQUEST
-        )
-        Row(horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
-            }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
             if (permissionState.status.shouldShowRationale) {
                 TextButton(onClick = { onDismiss(); launchRequest() }) {
                     Text("Grant")
                 }
             }
+        },
+        modifier = modifier,
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        },
+        icon = {
+            Icon(
+                painter = painterResource(R.drawable.photo_camera),
+                contentDescription = "Camera Permission",
+            )
+        },
+        title = { Text("Camera Permission") },
+        text = {
+            Text(
+                if (permissionState.status.shouldShowRationale) {
+                    RATIONALE
+                } else REQUEST
+            )
         }
-    }
+    )
 }
