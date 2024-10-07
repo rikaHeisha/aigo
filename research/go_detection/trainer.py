@@ -392,6 +392,13 @@ class GoTrainer:
             self.iter += 1
 
         logging.info("Finished training")
+        logging.info("Evaluating full dataest")
+        self.evaluate(
+            path.join("results", f"full_eval"),
+            render_dirs=[],
+            images_per_dir=None,
+            render_grid=True,
+        )
         self.tf_writer.flush()
 
     def _calculate_metrics(self, datapoints: DataPoints, model_output: torch.Tensor):
