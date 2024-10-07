@@ -129,18 +129,6 @@ class GoTrainer:
         # Create losses
         self.nll_loss = nn.NLLLoss(reduction="mean")
 
-        # data_point = next(iter(self.train_dataloader))
-        # visualize_datapoints(
-        #     data_point,
-        #     "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
-        #     max_viz_images=2,
-        # )
-        # visualize_single_datapoint(
-        #     data_point,
-        #     "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
-        #     0,
-        # )
-
     def _load_or_create_dataloader(self):
 
         if self.results_io.has_file("dataset_split.pt"):
@@ -267,9 +255,6 @@ class GoTrainer:
         eval_io = self.results_io.cd(evaluate_path)
         eval_io.mkdir("render_grid")
 
-        # indices = render_index or list(range(len(self.test_dataloader.dataset)))
-        # indices = [_ for _ in indices if _ < len(self.test_dataloader.dataset)]
-
         # TODO(rishi): Use the dataloader instead of directly accessing the dataset. For this, we need to get rid of the render_index parameter and find a better config that the user can set
         # Actually a great way of doing this will be to iterate through the whole dataset and selectively rendering. This is a good idea since we anyway have to iterate through the entire thing
 
@@ -380,7 +365,7 @@ class GoTrainer:
         logging.info("Finished training")
         self.tf_writer.flush()
 
-    def _calculate_metrics(self, datapoints, model_output):
+    def _calculate_metrics(self, datapoints: DataPoints, model_output: torch.Tensor):
         map_metrics: Dict[str, MetricValue] = {}
 
         num_images = datapoints.images.shape[0]
