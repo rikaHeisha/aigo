@@ -4,8 +4,10 @@ import sys
 import time
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
+from math import isclose
 from os import mkdir, path
-from typing import Dict, List, Optional, Tuple, TypeVar, Union, cast
+from typing import Dict, List, Literal, Optional, Tuple, TypeVar, Union, cast
 
 import numpy as np
 import torch
@@ -51,16 +53,52 @@ class MetricValue:
             return self.base_value * self.weight
 
     def __str__(self):
-        return f"MetricValue:\n  base_value: {self.base_value}\n  weight: {self.weight or 'None'}"
+        return (
+            f"MetricValue(base_value={self.base_value}, weight={self.weight or 'None'})"
+        )
 
     def __repr__(self):
-        return f"MetricValue:\n  base_value: {self.base_value}\n  weight: {self.weight or 'None'}"
+        return (
+            f"MetricValue(base_value={self.base_value}, weight={self.weight or 'None'})"
+        )
 
     def __format__(self, spec):
         if self.weight is None:
             return f"{self.base_value:{spec}}"
         else:
             return f"({self.base_value:{spec}}, {self.weight:{spec}})"
+
+
+def combine_metrics(
+    list_metrics: List[MetricValue], reduction: Literal["mean", "sum"] = "mean"
+) -> MetricValue:
+    assert len(list_metrics) > 0, "Cannot combine an empty list of metrics"
+    if len(list_metrics) == 1:
+        return list_metrics[0]
+
+    for metric in list_metrics:
+        if list_metrics[0].has_weight():
+            assert (
+                metric.has_weight()
+            ), "Cannot combine metrics, some have weights and some don't"
+            assert isclose(
+                list_metrics[0].weight, metric.weight
+            ), f"Cannot combine metrics, expected the weight of all metrics to be the same"
+        else:
+            assert (
+                not metric.has_weight()
+            ), "Cannot combine metrics, some have weights and some don't"
+
+    # They all have the same weight, combine the base_value
+    base_values = torch.stack([_.base_value for _ in list_metrics], dim=0)
+    if reduction == "mean":
+        metric = MetricValue(base_values.mean(), list_metrics[0].weight)
+    elif reduction == "sum":
+        metric = MetricValue(base_values.sum(), list_metrics[0].weight)
+    else:
+        assert False, f"Unknown reduction mode: {reduction}"
+
+    return metric
 
 
 # For debugging
@@ -216,7 +254,9 @@ class GoTrainer:
             "optimizer_state_dict": self.optimizer.state_dict(),
         }
         logger.info(f"Saving checkpoint at iter: {self.iter}")
-        self.results_io.save_torch("checkpoint.pt", checkpoint_data)
+        self.results_io.save_torch(
+            "checkpoint.pt", checkpoint_data
+        )  # TODO(rishi): Save all pt files to a different folder
 
     def get_parameters(self):
         parameters = self.model.parameters()
@@ -340,7 +380,7 @@ class GoTrainer:
         )
 
     def start(self):
-        # logging.info("Starting training")
+        logging.info("Starting training")
 
         # self.evaluate(
         #     path.join("results", f"iter_{self.iter:05}"),
@@ -358,17 +398,18 @@ class GoTrainer:
         # sys.exit(0)
 
         while self.iter <= self.cfg.iters:
+            last_iter = self.iter == self.cfg.iters
             output_map = self.train_step()
 
-            if self.iter % self.cfg.i_print == 0:
+            if self.iter % self.cfg.i_print == 0 or last_iter:
                 logger.info(
                     f'Exp: {self.cfg.result_cfg.name}, Iter: {self.iter} / {self.cfg.iters}, Memory: {output_map["memory"]:.2f} GB, total_loss: {output_map["total_loss"]:.4f}'
                 )
 
-            if self.iter % self.cfg.i_weight == 0:
+            if self.iter % self.cfg.i_weight == 0 or last_iter:
                 self.save_checkpoint()
 
-            if self.iter % self.cfg.i_tf_writer == 0:
+            if self.iter % self.cfg.i_tf_writer == 0 or last_iter:
                 # Upload the output_map of the last mini batch
                 self._upload_metrics_to_tf(self.iter, output_map, "epoch__")
 
@@ -376,11 +417,10 @@ class GoTrainer:
                 eval_output_map = self.eval_step()
                 self._upload_metrics_to_tf(self.iter, eval_output_map, "test__")
 
-            if self.iter % self.cfg.i_eval == 0:
+            # At last iter we evaluate the full dataset
+            if self.iter % self.cfg.i_eval == 0 and not last_iter:
                 logger.info("Starting evaluation")
-
                 evaluate_path = path.join("results", f"iter_{self.iter:05}")
-
                 eval_cfg = self.cfg.result_cfg.eval_cfg
                 self.evaluate(
                     evaluate_path,
@@ -430,6 +470,13 @@ class GoTrainer:
 
         memory_gb = torch.cuda.max_memory_allocated() / 1024**3
         map_metrics["memory"] = MetricValue(memory_gb)
+
+        _, model_label = model_output.max(dim=1)
+        num_correct = (gt_labels == model_label).sum()
+        num_incorrect = (gt_labels != model_label).sum()
+        map_metrics["accuracy"] = MetricValue(
+            num_correct / (num_correct + num_incorrect)
+        )
 
         return map_metrics
 
@@ -482,15 +529,11 @@ class GoTrainer:
                     f'Eval Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"]:.2f} GB, total_loss: {map_metrics["total_loss"]:.4f}'
                 )
 
-                if idx >= 0:
+                if idx >= 4:
                     break
 
             map_metrics: Dict[str, MetricValue] = {}
             for metric_name, list_metrics in aggregated_map_metrics.items():
-                if metric_name in ["total_loss"]:
-                    list_values = [_.base_value for _ in list_metrics]
-                    map_metrics[metric_name] = MetricValue(
-                        torch.stack(list_values, dim=0).mean()
-                    )
+                map_metrics[metric_name] = combine_metrics(list_metrics)
 
             return map_metrics

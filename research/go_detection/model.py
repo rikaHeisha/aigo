@@ -57,6 +57,7 @@ class GoModel(nn.Module):
         self.log_softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, images):
+        assert images.ndim == 4
         num_images = images.shape[0]
 
         x0 = images
