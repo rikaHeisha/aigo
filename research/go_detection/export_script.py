@@ -26,7 +26,7 @@ def do_main(cfg: SimCfg):
     result_io.mkdir("export")
 
     go_trainer = GoTrainer(cfg)
-    assert go_trainer.iter > 0, "Model should be trained before exporting"
+    assert go_trainer.iter > 2, "Model should be trained before exporting"
 
     export_path = path.join("export", "model.tflite")
     datapoints = cast(
