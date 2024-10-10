@@ -20,6 +20,7 @@ class DownNet(nn.Module):
             ),
             nn.LeakyReLU(inplace=True),
             nn.BatchNorm2d(out_c),
+            nn.Dropout(p=0.2),
             nn.MaxPool2d(kernel_size=2),
         )
 
