@@ -68,6 +68,9 @@ class MetricValue:
         else:
             return f"({self.base_value:{spec}}, {self.weight:{spec}})"
 
+    def detach(self) -> "MetricValue":
+        return MetricValue(self.base_value.detach(), self.weight)
+
 
 def combine_metrics(
     list_metrics: List[MetricValue], reduction: Literal["mean", "sum"] = "mean"
@@ -145,9 +148,15 @@ class GoTrainer:
         # Create the tf writer
         self.results_io = cfg.result_cfg.get_asset_io()
         self.results_io.mkdir("tf")
-        run_number = (
-            len([_ for _ in self.results_io.ls("tf") if self.results_io.has_dir(_)]) + 1
-        )
+
+        # Calculate the run number
+        existing_run_files = [
+            int(_.removeprefix("tf/run_"))
+            for _ in self.results_io.ls("tf")
+            if self.results_io.has_dir(_)
+        ]
+        # run_number = len(existing_run_files) + 1 # Naive solution
+        run_number = (max(existing_run_files) + 1) if existing_run_files != [] else 1
 
         tf_path = path.join("tf", f"run_{run_number}")
         assert self.results_io.has(tf_path) == False
@@ -402,6 +411,9 @@ class GoTrainer:
         while self.iter <= self.cfg.iters:
             last_iter = self.iter == self.cfg.iters
             output_map = self.train_step()
+            eval_output_map = None
+            if self.iter % self.cfg.i_tf_writer == 0 or last_iter:
+                eval_output_map = self.eval_step()
 
             if self.iter % self.cfg.i_print == 0 or last_iter:
                 logger.info(
@@ -416,8 +428,11 @@ class GoTrainer:
                 self._upload_metrics_to_tf(self.iter, output_map, "epoch__")
 
                 # Upload output map of eval
-                eval_output_map = self.eval_step()
-                self._upload_metrics_to_tf(self.iter, eval_output_map, "test__")
+                if eval_output_map is not None:
+                    logger.info(
+                        f'Eval Iter: {self.iter} / {self.cfg.iters}, Memory: {eval_output_map["memory"]:.2f} GB, total_loss: {eval_output_map["total_loss"]:.4f}'
+                    )
+                    self._upload_metrics_to_tf(self.iter, eval_output_map, "test__")
 
             # At last iter we evaluate the full dataset
             if self.iter % self.cfg.i_eval == 0 and not last_iter:
@@ -484,7 +499,8 @@ class GoTrainer:
 
     def train_step(self):
         # Iterate through all the training datasets
-        map_metrics: Dict[str, MetricValue] = {}
+        aggregated_map_metrics: Dict[str, List[MetricValue]] = defaultdict(list)
+
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
 
@@ -507,9 +523,18 @@ class GoTrainer:
             map_metrics["total_loss"].base_value.backward()
             self.optimizer.step()
 
-            # break
+            # Add to aggregated map AFTER we do optimizer.step. This is so that we don't keep storing the gradients
+            for matric_name, metric in map_metrics.items():
+                aggregated_map_metrics[matric_name].append(metric.detach())
+
+            # if idx >= 5:
+            #     break
 
         # Completed one epoch
+        map_metrics: Dict[str, MetricValue] = {}
+        for metric_name, list_metrics in aggregated_map_metrics.items():
+            map_metrics[metric_name] = combine_metrics(list_metrics)
+
         return map_metrics
 
     def eval_step(self):
@@ -528,11 +553,11 @@ class GoTrainer:
                     aggregated_map_metrics[matric_name].append(metric)
 
                 print(
-                    f'Eval Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"]:.2f} GB, total_loss: {map_metrics["total_loss"]:.4f}'
+                    f'Eval Iter: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"]:.2f} GB, total_loss: {map_metrics["total_loss"]:.4f}'
                 )
 
-                if idx >= 4:
-                    break
+                # if idx >= 4:
+                #     break
 
             map_metrics: Dict[str, MetricValue] = {}
             for metric_name, list_metrics in aggregated_map_metrics.items():

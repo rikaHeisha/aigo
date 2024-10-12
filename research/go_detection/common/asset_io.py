@@ -15,6 +15,9 @@ class AssetIO:
     def __init__(self, base_path):
         self.base_path = base_path
 
+    def __repr__(self):
+        return f'AssetIO(base_path="{self.base_path}")'
+
     def _abs(self, rel_path: str):
         return (
             os.path.join(self.base_path, rel_path) if rel_path != "" else self.base_path
