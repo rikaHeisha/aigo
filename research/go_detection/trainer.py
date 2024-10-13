@@ -167,12 +167,21 @@ class GoTrainer:
         self.iter = 1
         self.model = GoModel(self.cfg.model_cfg)
         self.model = self.model.cuda()
-        self.optimizer = torch.optim.Adam(
-            self.get_parameters(), lr=1e-3, weight_decay=0.0
-        )
-        # self.optimizer = torch.optim.SGD(
-        #     self.get_parameters(), lr=1e-3, weight_decay=0.0, dampening=0.0
-        # )
+
+        if self.cfg.model_cfg.optimizer_type == "adam":
+            self.optimizer = torch.optim.Adam(
+                self.get_parameters(),
+                lr=1e-3,
+                weight_decay=self.cfg.model_cfg.optimizer_weight_decay,
+            )
+        elif self.cfg.model_cfg.optimizer_type == "sgd":
+            self.optimizer = torch.optim.SGD(
+                self.get_parameters(),
+                lr=1e-3,
+                weight_decay=self.cfg.model_cfg.optimizer_weight_decay,
+            )
+        else:
+            assert False, f"Unknown optimizer type: {self.cfg.model_cfg.optimizer_type}"
 
         # Create the dataloader and load checkpoint
         self.train_dataloader, self.test_dataloader = self._load_or_create_dataloader()

@@ -17,7 +17,9 @@ data_cfg:
   train_batch_size: 20
   test_batch_size: 20
 
-model_cfg: {}
+model_cfg:
+  optimizer_type: "adam"
+  optimizer_weight_decay: 0.0
 
 result_cfg:
   dir: /home/rmenon/Desktop/dev/ml_results/aigo_results

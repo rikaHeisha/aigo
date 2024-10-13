@@ -388,17 +388,17 @@ def filter_datapoints_train(
     base_path: str,
 ) -> List[DataPointPath]:
     return train_paths
-    logger.info("filtering sparse training boards")
-    filtered_paths = []
-    data_io = AssetIO(base_path)
+    # logger.info("filtering sparse training boards")
+    # filtered_paths = []
+    # data_io = AssetIO(base_path)
 
-    for data_point in train_paths:
-        label = _read_label(data_io, data_point.label_path)
-        num_pieces = (label != 1).sum().item()
-        if num_pieces > 50:
-            filtered_paths.append(data_point)
+    # for data_point in train_paths:
+    #     label = _read_label(data_io, data_point.label_path)
+    #     num_pieces = (label != 1).sum().item()
+    #     if num_pieces > 50:
+    #         filtered_paths.append(data_point)
 
-    return filtered_paths
+    # return filtered_paths
 
 
 def create_datasets_split(

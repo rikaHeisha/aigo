@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass, field
-from typing import List, Optional, cast
+from typing import List, Literal, Optional, cast
 
 from go_detection.common.asset_io import AssetIO
 
@@ -47,7 +47,16 @@ class ResultCfg:
 
 @dataclass
 class ModelCfg:
+    optimizer_type: str = "adam"  # Can either be "adam" or "sgd"
+    optimizer_weight_decay: float = 0.0
+
     _target_: str = f"{__module__}.{__qualname__}"
+
+    def __post_init__(self):
+        assert self.optimizer_type in [
+            "adam",
+            "sgd",
+        ], f"Unsuported optimizer type: {self.optimizer_type}"
 
 
 @dataclass
