@@ -269,6 +269,35 @@ class GoTrainer:
             "checkpoint.pt", checkpoint_data
         )  # TODO(rishi): Save all pt files to a different folder
 
+        verify_checkpoint = True
+        if verify_checkpoint:
+            logger.info("Verifying checkpoint")
+            checkpoint_data = self.results_io.load_torch("checkpoint.pt")
+            for key, param_orig in self.model.state_dict().items():
+                param_checkpoint = checkpoint_data["model_state_dict"][key].cuda()
+                atol = 1e-7
+                if not torch.isclose(param_orig, param_checkpoint, atol=atol).all():
+                    a = (
+                        ~torch.isclose(param_orig, param_checkpoint, atol=atol)
+                    ).nonzero()
+                    # self.results_io.save_torch("temp.pt", param_orig)
+                    # b = self.results_io.load_torch("temp.pt")
+
+                    logger.error(f"Checkpoint model params does not match: {key}")
+
+            if (
+                self.optimizer.state_dict()["state"]
+                != checkpoint_data["optimizer_state_dict"]["state"]
+            ):
+                logger.error(f"Checkpoint optimizer state does not match")
+
+            for param_orig, param_ckpt in zip(
+                self.optimizer.state_dict()["param_groups"],
+                checkpoint_data["optimizer_state_dict"]["param_groups"],
+            ):
+                if param_orig != param_ckpt:
+                    logger.error(f"Checkpoint optimizer param_groups does not match")
+
     def get_parameters(self):
         parameters = self.model.parameters()
         return parameters
@@ -527,7 +556,7 @@ class GoTrainer:
             for matric_name, metric in map_metrics.items():
                 aggregated_map_metrics[matric_name].append(metric.detach())
 
-            # if idx >= 5:
+            # if idx >= 1:
             #     break
 
         # Completed one epoch
@@ -556,7 +585,7 @@ class GoTrainer:
                     f'Eval Iter: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"]:.2f} GB, total_loss: {map_metrics["total_loss"]:.4f}'
                 )
 
-                # if idx >= 4:
+                # if idx >= 1:
                 #     break
 
             map_metrics: Dict[str, MetricValue] = {}

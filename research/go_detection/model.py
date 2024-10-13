@@ -33,7 +33,6 @@ class GoModel(nn.Module):
     def __init__(self, cfg: ModelCfg):
         super().__init__()
         self.cfg = cfg
-        self.weight = nn.Parameter(torch.tensor([2.0]))
 
         cs = [3, 4, 8, 32, 64, 128, 128, 128]
         self.stage1 = DownNet(cs[0], cs[1], 3, 0)
