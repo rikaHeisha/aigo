@@ -10,8 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from go_detection.common.asset_io import AssetIO
 from go_detection.config import SimCfg
-from go_detection.dataloader import DataPoint, DataPoints
-from go_detection.export_util import export_model
+from go_detection.dataloader import DataPoint, DataPoints, create_datasets
 from go_detection.trainer import GoTrainer
 from hydra.core.config_store import ConfigStore
 from hydra.core.hydra_config import HydraConfig
@@ -22,19 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def do_main(cfg: SimCfg):
-    result_io = AssetIO(path.join(cfg.result_cfg.dir, cfg.result_cfg.name))
-    result_io.mkdir("export")
-
-    go_trainer = GoTrainer(cfg)
-    assert go_trainer.iter > 2, "Model should be trained before exporting"
-
-    export_path = path.join("export", "model.tflite")
-    datapoints = cast(
-        DataPoint, go_trainer.train_dataloader.dataset[0]
-    ).to_data_points()
-    export_model(
-        go_trainer.model, result_io.get_abs(export_path), datapoints.images.shape
-    )
+    train, test = create_datasets(cfg.data_cfg)
 
 
 @hydra.main(config_path="../config", config_name="basic", version_base="1.2")
@@ -45,11 +32,30 @@ def main(cfg):
     cfg_yaml = OmegaConf.to_yaml(cfg)
     logger.info("Config:\n%s", cfg_yaml)
 
-    logger.info("Hydra dir set to: %s", HydraConfig.get().run.dir)
-    logger.info(f"Log Level: {HydraConfig.get().job_logging.root.level}")
-
     do_main(cfg)
 
+
+# def common_main(task_function: Callable[[], None]) -> Callable[[], None]:
+#     @functools.wraps(task_function)
+#     def decorator():
+#         cs = ConfigStore.instance()
+#         cs.store(name="sim_cfg_default", node=SimCfg)
+
+#         if os.environ.get("ENABLE_DEBUGPY"):
+#             print("")
+#             print("\033[31mWaiting for debugger to connect\033[0m")
+#             debugpy.listen(5678)
+#             debugpy.wait_for_client()
+
+#         # @hydra.main(config_path="../config", config_name="basic", version_base="1.2")
+#         with initialize(version_base="1.2", config_path="../config", job_name=None):
+#             overrides = sys.argv[1:]
+#             cfg = compose(config_name="basic", overrides=overrides)
+#             cfg = instantiate(cfg)
+
+#         task_function(cfg)
+
+#     return decorator
 
 if __name__ == "__main__":
     # Register configs

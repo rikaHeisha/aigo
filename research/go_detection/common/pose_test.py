@@ -1,7 +1,7 @@
 from math import pi
 
 import torch
-from common.pose import Pose3d
+from go_detection.common.pose import Pose3d
 
 
 def test_translation():

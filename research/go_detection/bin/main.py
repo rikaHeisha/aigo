@@ -7,11 +7,13 @@ from typing import List, Optional
 
 import debugpy
 import hydra
-from common.asset_io import AssetIO
-from config import SimCfg
+from go_detection.bin.common_main import common_main
+from go_detection.common.asset_io import AssetIO
 from go_detection.common.git_utils import get_git_info
+from go_detection.config import SimCfg
 from go_detection.dataloader import create_datasets
 from go_detection.trainer import GoTrainer
+from hydra import compose, initialize
 from hydra.core.config_store import ConfigStore
 from hydra.core.hydra_config import HydraConfig
 from hydra.utils import instantiate
@@ -25,7 +27,7 @@ def do_main(cfg: SimCfg):
     go_trainer.start()
 
 
-@hydra.main(config_path="config", config_name="basic", version_base="1.2")
+@hydra.main(config_path="../config", config_name="basic", version_base="1.2")
 def main(cfg: SimCfg):
     OmegaConf.set_readonly(cfg, True)
 

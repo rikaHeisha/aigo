@@ -17,6 +17,8 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchvision.transforms.functional import crop
 from tqdm import tqdm
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class DataPointPath:
@@ -80,9 +82,6 @@ class DataPoints:
             self.labels[index],
             self.board_pts[index],
         )
-
-
-logger = logging.getLogger(__name__)
 
 
 class InfiniteSampler(Sampler):
@@ -389,6 +388,7 @@ def filter_datapoints_train(
     base_path: str,
 ) -> List[DataPointPath]:
     return train_paths
+    logger.info("filtering sparse training boards")
     filtered_paths = []
     data_io = AssetIO(base_path)
 
