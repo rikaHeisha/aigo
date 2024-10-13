@@ -4,7 +4,7 @@ import random
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, cast
+from typing import List, Tuple, cast
 
 import numpy as np
 import torch
@@ -370,7 +370,26 @@ def load_datasets(
     return train_dataloader, test_dataloader
 
 
-def create_datasets(cfg: DataCfg):
+def filter_datapoints_train(
+    train_paths: List[DataPointPath],
+    base_path: str,
+) -> List[DataPointPath]:
+    # return entire_data
+    filtered_paths = []
+    data_io = AssetIO(base_path)
+
+    for data_point in train_paths:
+        label = _read_label(data_io, data_point.label_path)
+        num_pieces = (label != 1).sum().cpu().item()
+        if num_pieces > 50:
+            filtered_paths.append(data_point)
+
+    return filtered_paths
+
+
+def create_datasets_split(
+    cfg: DataCfg,
+) -> Tuple[List[DataPointPath], List[DataPointPath]]:
     data_io = AssetIO(cfg.base_path)
     directories = sorted(data_io.ls())
 
@@ -437,4 +456,10 @@ def create_datasets(cfg: DataCfg):
     train = list(itertools.chain(*train))
     test = list(itertools.chain(*test))
 
+    train = filter_datapoints_train(train, cfg.base_path)
+    return train, test
+
+
+def create_datasets(cfg: DataCfg):
+    train, test = create_datasets_split(cfg)
     return load_datasets(cfg, train, test)

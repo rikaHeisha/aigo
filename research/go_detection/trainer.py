@@ -168,7 +168,7 @@ class GoTrainer:
         self.model = GoModel(self.cfg.model_cfg)
         self.model = self.model.cuda()
         self.optimizer = torch.optim.SGD(
-            self.get_parameters(), lr=1e-3, weight_decay=1e-2, dampening=0.0
+            self.get_parameters(), lr=1e-3, weight_decay=0.0, dampening=0.0
         )
 
         # Create the dataloader and load checkpoint

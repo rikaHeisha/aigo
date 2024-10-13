@@ -36,3 +36,7 @@ google-services.json
 # Python
 __pycache__
 .ipynb_checkpoints/
+
+
+# For not dont commit jupyter notebooks
+*.ipynb
