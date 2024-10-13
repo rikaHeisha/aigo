@@ -1,4 +1,5 @@
 import itertools
+from collections import defaultdict
 
 import numpy as np
 import torch
@@ -167,10 +168,32 @@ def visualize_grid(
         # axis.patch.set_edgecolor("white")
         # axis.patch.set_linewidth(10)
 
-    plt.savefig(output_path, bbox_inches="tight", pad_inches=0)
+    fig.savefig(output_path, bbox_inches="tight", pad_inches=0)
     plt.close(fig)
     # plt.show()
     # sys.exit(0)
+
+
+def visualize_accuracy_over_num_pieces(data, fig_path: str):
+    map_num_piece_to_accuracy = defaultdict(list)
+    for point in data:
+        map_num_piece_to_accuracy[point[0]].append(point[1])
+    accuracy_points = np.array(
+        [(k, sum(v) / len(v)) for k, v in map_num_piece_to_accuracy.items()]
+    )
+    accuracy_points = np.sort(accuracy_points, axis=0)
+
+    fig, ax = plt.subplots()
+    ax.plot(accuracy_points[:, 0], 100.0 * accuracy_points[:, 1])
+
+    ax.set(
+        xlabel="Number Of Pieces",
+        ylabel="Accuracy (%)",
+        title="Accuracy Over Number Of Pieces",
+    )
+    ax.grid()
+    fig.savefig(fig_path)
+    plt.close(fig)
 
 
 def visualize_grid_plotly(

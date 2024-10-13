@@ -22,7 +22,10 @@ from go_detection.dataloader import (
     create_datasets,
     load_datasets,
 )
-from go_detection.dataloader_viz import visualize_grid
+from go_detection.dataloader_viz import (
+    visualize_accuracy_over_num_pieces,
+    visualize_grid,
+)
 from go_detection.model import GoModel
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
@@ -297,11 +300,15 @@ class GoTrainer:
 
                     logger.error(f"Checkpoint model params does not match: {key}")
 
-            if (
-                self.optimizer.state_dict()["state"]
-                != checkpoint_data["optimizer_state_dict"]["state"]
-            ):
-                logger.error(f"Checkpoint optimizer state does not match")
+            for key, value in self.optimizer.state_dict()["state"].items():
+                ckpt_value = checkpoint_data["optimizer_state_dict"]["state"][key]
+                for param_key in value.keys():
+                    if not torch.isclose(
+                        value[param_key].cpu(), ckpt_value[param_key]
+                    ).all():
+                        logger.error(
+                            f"Checkpoint optimizer state does not match: {key} {param_key}"
+                        )
 
             for param_orig, param_ckpt in zip(
                 self.optimizer.state_dict()["param_groups"],
@@ -364,7 +371,6 @@ class GoTrainer:
         self.model.eval()
         with torch.no_grad():
             # TODO(rishi) support multiple images at once
-            list_accuracy = []
             for idx in tqdm(indices, desc=f"Rendering for iter {self.iter}"):
                 assert idx < len(
                     dataset
@@ -392,20 +398,47 @@ class GoTrainer:
 
                 # Append this image to the report.yaml
                 accuracy = num_correct / (num_correct + num_incorrect)
-                list_accuracy.append(accuracy)
 
                 report_data[image_name] = {}
                 report_data[image_name]["path"] = datapoint_paths[idx].image_path
                 report_data[image_name]["num_pieces"] = num_pieces
                 report_data[image_name]["num_correct"] = num_correct
                 report_data[image_name]["num_incorrect"] = num_incorrect
-                report_data[image_name]["accuracy"] = f"{100 * accuracy:.4f} %"
+                report_data[image_name]["accuracy"] = accuracy
 
-            report_data["overall"] = {}
-            report_data["overall"][
-                "accuracy"
-            ] = f"{100 * sum(list_accuracy) / len(list_accuracy):.4f} %"
-            eval_io.save_yaml("report.yaml", report_data)
+        list_accuracy = [v["accuracy"] for v in report_data.values()]
+
+        # Plot accuracy over num_pieces
+        points = [(v["num_pieces"], v["accuracy"]) for v in report_data.values()]
+        visualize_accuracy_over_num_pieces(points, eval_io.get_abs("plot_accuracy.png"))
+
+        report_data["overall"] = {}
+        report_data["overall"]["accuracy"] = sum(list_accuracy) / len(list_accuracy)
+
+        # Draw plot of accuracy over num_pieces
+        map_num_pieces_accuracy = defaultdict(list)
+        for image_name, value in report_data.items():
+            if image_name == "overall":
+                continue
+            map_num_pieces_accuracy[value["num_pieces"]].append(value["accuracy"])
+
+        map_num_pieces_accuracy = {
+            k: sum(v) / len(v) for k, v in map_num_pieces_accuracy.items()
+        }
+
+        # this gets stored to yaml
+        report_data_sanitized = {}
+        for image_name, value in report_data.items():
+            report_data_sanitized[image_name] = {}
+            for prop_name, value_sub in value.items():
+                if prop_name == "accuracy":
+                    report_data_sanitized[image_name][
+                        prop_name
+                    ] = f"{100.0 * value_sub:.4f} %"
+                else:
+                    report_data_sanitized[image_name][prop_name] = value_sub
+
+        eval_io.save_yaml("report.yaml", report_data_sanitized)
 
     def evaluate(
         self,

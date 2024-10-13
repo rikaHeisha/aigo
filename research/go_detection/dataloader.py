@@ -84,6 +84,26 @@ class DataPoints:
         )
 
 
+class DistSampler(Sampler):
+    def __init__(self, pmf: List[int], repeat: bool):
+        self.pmf = pmf
+        self.repeat = repeat
+
+    # def __len__(self):
+    #     return len(self.pmf)
+
+    def __iter__(self):
+        indices = list(range(len(self.pmf)))
+
+        while True:
+            order = np.random.choice(indices, len(indices), replace=True, p=self.pmf)
+            for idx in order:
+                yield idx
+
+            if not self.repeat:
+                return
+
+
 class InfiniteSampler(Sampler):
     def __init__(self, length: int, shuffle: bool, repeat: bool):
         assert length > 0
