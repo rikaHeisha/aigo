@@ -297,6 +297,15 @@ def _load(entire_data: List[DataPointPath], data_io: AssetIO, include_logs=True)
     return images, labels, board_pts
 
 
+def _load_num_pieces(data_io: AssetIO, datapoint_paths: List[DataPointPath]):
+    list_num_pieces = []
+    for datapoint_path in datapoint_paths:
+        label = _read_label(data_io, datapoint_path.label_path)
+        num_pieces = (label != 1).sum()
+        list_num_pieces.append(num_pieces)
+    return torch.stack(list_num_pieces, dim=0)
+
+
 class GoDataset(Dataset):
     def __init__(
         self,
@@ -304,15 +313,19 @@ class GoDataset(Dataset):
         base_path: str,
     ):
         self.datapoint_paths = datapoint_paths
-        self.images, self.labels, self.board_pts = _load(
+        self.num_pieces = _load_num_pieces(AssetIO(base_path), datapoint_paths)
+
+        self._images, self._labels, self._board_pts = _load(
             datapoint_paths, AssetIO(base_path)
         )
 
     def __len__(self):
-        return len(self.labels)
+        return len(self._labels)
 
     def __getitem__(self, idx) -> DataPoint:
-        data_point = DataPoint(self.images[idx], self.labels[idx], self.board_pts[idx])
+        data_point = DataPoint(
+            self._images[idx], self._labels[idx], self._board_pts[idx]
+        )
         return data_point.cuda()
 
 
@@ -326,14 +339,15 @@ class GoDynamicDataset(Dataset):
         datapoint_paths: List[DataPointPath],
         base_path: str,
     ):
+        self._data_io = AssetIO(base_path)
         self.datapoint_paths = datapoint_paths
-        self.data_io = AssetIO(base_path)
+        self.num_pieces = _load_num_pieces(AssetIO(base_path), datapoint_paths)
 
     def __len__(self):
         return len(self.datapoint_paths)
 
     def __getitem__(self, idx) -> DataPoint:
-        data_point = _load_single(self.datapoint_paths[idx], self.data_io)
+        data_point = _load_single(self.datapoint_paths[idx], self._data_io)
         return data_point.cuda()
 
 
@@ -374,13 +388,13 @@ def filter_datapoints_train(
     train_paths: List[DataPointPath],
     base_path: str,
 ) -> List[DataPointPath]:
-    # return entire_data
+    return train_paths
     filtered_paths = []
     data_io = AssetIO(base_path)
 
     for data_point in train_paths:
         label = _read_label(data_io, data_point.label_path)
-        num_pieces = (label != 1).sum().cpu().item()
+        num_pieces = (label != 1).sum().item()
         if num_pieces > 50:
             filtered_paths.append(data_point)
 
