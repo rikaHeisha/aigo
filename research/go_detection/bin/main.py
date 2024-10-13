@@ -7,7 +7,6 @@ from typing import List, Optional
 
 import debugpy
 import hydra
-from go_detection.bin.common_main import common_main
 from go_detection.common.asset_io import AssetIO
 from go_detection.common.git_utils import get_git_info
 from go_detection.config import SimCfg
