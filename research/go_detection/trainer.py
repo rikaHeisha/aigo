@@ -367,6 +367,7 @@ class GoTrainer:
                 predicted_label = predicted_label.reshape(data_points.labels[0].shape)
                 gt_label = data_points.labels[0]
 
+                num_pieces = (gt_label != 1).sum().item()
                 num_correct = (gt_label == predicted_label).sum().item()
                 num_incorrect = (gt_label != predicted_label).sum().item()
 
@@ -383,6 +384,7 @@ class GoTrainer:
 
                 report_data[image_name] = {}
                 report_data[image_name]["path"] = datapoint_paths[idx].image_path
+                report_data[image_name]["num_pieces"] = num_pieces
                 report_data[image_name]["num_correct"] = num_correct
                 report_data[image_name]["num_incorrect"] = num_incorrect
                 report_data[image_name]["accuracy"] = f"{100 * accuracy:.4f} %"
