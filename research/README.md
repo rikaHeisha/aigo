@@ -36,7 +36,7 @@ tensorboard --logdir=/home/rmenon/Desktop/dev/ml_results/aigo_results
 ## Jupyter Notebook
 Run the following to launch a jupyter notebook:
 ```
-jupyter-notebook --dir=<dir>
+jupyter-notebook --dir=/home/rmenon/Desktop/dev/projects/aigo/research
 ```
 
 ## Unit tests
