@@ -35,3 +35,4 @@ google-services.json
 
 # Python
 __pycache__
+.ipynb_checkpoints/
