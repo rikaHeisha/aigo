@@ -39,4 +39,4 @@ __pycache__
 
 
 # For not dont commit jupyter notebooks
-*.ipynb
+# *.ipynb
