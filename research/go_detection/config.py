@@ -80,4 +80,7 @@ class SimCfg:
     i_weight: int
     i_print: int
     i_tf_writer: int = cast(int, "${i_print}")  # TODO(rishi) move this to a tf_config
+
+    profile: bool = False
+
     _target_: str = f"{__module__}.{__qualname__}"

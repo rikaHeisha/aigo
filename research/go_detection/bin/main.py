@@ -1,6 +1,9 @@
+import cProfile
 import logging
 import os
 import sys
+import tempfile
+import uuid
 from datetime import datetime
 from os import path
 from typing import List, Optional
@@ -88,7 +91,23 @@ def main(cfg: SimCfg):
         f"Log Level: {HydraConfig.get().job_logging.root.level}, Log File: {log_file}"
     )
 
-    do_main(cfg)
+    if cfg.profile:
+        # file_path = f"/tmp/go_{str(uuid.uuid4())}.hprof"
+        file_path = datetime.now().strftime("/tmp/profiling_go_%Y-%m-%d_%H-%M-%S.hprof")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        # with tempfile.NamedTemporaryFile(
+        #     prefix="go_", suffix=".hprof", delete=False
+        # ) as file:
+
+        logger.info(f"Dumping stats to {file_path}")
+        with cProfile.Profile() as pr:
+            do_main(cfg)
+            pr.dump_stats(file=file_path)
+
+        logger.info(f"Dumping stats to {file_path}")
+    else:
+        do_main(cfg)
 
 
 if __name__ == "__main__":
