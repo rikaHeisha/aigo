@@ -11,7 +11,14 @@ import torch.nn.functional as F
 from go_detection.common.asset_io import AssetIO
 from go_detection.common.matplotlib_utils import draw_histogram
 from go_detection.config import SimCfg
-from go_detection.dataloader import DataPoint, DataPoints, DistSampler, create_datasets
+from go_detection.dataloader import (
+    DataPoint,
+    DataPoints,
+    DistSampler,
+    NonReplacementSampler,
+    UniformSampler,
+    create_datasets,
+)
 from go_detection.dataloader_viz import visualize_accuracy_over_num_pieces
 from go_detection.trainer import GoTrainer
 from hydra.core.config_store import ConfigStore
@@ -24,7 +31,34 @@ logger = logging.getLogger(__name__)
 
 
 def do_main(cfg: SimCfg):
-    # train, test = create_datasets(cfg.data_cfg)
+    train, test = create_datasets(cfg.data_cfg)
+    train_dataset, test_dataset = train.dataset, test.dataset
+
+    def draw_hist_with_sampler(sampler, fig_path, num_samples):
+        data = []
+        for _ in range(num_samples):
+            idx = next(sampler_iter)
+            data.append(train_dataset.num_pieces[idx].item())
+        data = np.array(data)
+        draw_histogram(
+            data,
+            fig_path,
+            bins=data.max(),
+        )
+
+    sampler_iter = iter(NonReplacementSampler(len(train_dataset), False))
+    draw_hist_with_sampler(
+        sampler_iter,
+        "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
+        len(train_dataset),
+    )
+
+    sampler_iter = iter(UniformSampler(len(train_dataset), 1000))
+    draw_hist_with_sampler(
+        sampler_iter,
+        "/home/rmenon/Desktop/dev/projects/aigo/research/rishi_2.png",
+        10**6,
+    )
 
     # t = np.arange(0.0, 2.0, 0.01)
 
@@ -43,24 +77,24 @@ def do_main(cfg: SimCfg):
     # )
 
     # # plt.show()
+    # #######################
+    # weights = np.array([1, 2, 2, 4])
+    # pmf = weights / weights.sum()
 
-    weights = np.array([1, 2, 2, 4])
-    pmf = weights / weights.sum()
+    # sampler = DistSampler(pmf, 3)
+    # sampler_iter = iter(sampler)
 
-    sampler = DistSampler(pmf, 3)
-    sampler_iter = iter(sampler)
+    # indices = []
+    # for _ in range(1000):
+    #     idx = next(sampler_iter)
+    #     indices.append(idx)
 
-    indices = []
-    for _ in range(1000):
-        idx = next(sampler_iter)
-        indices.append(idx)
-
-    print(f"First few indices: {indices[:10]}")
-    draw_histogram(
-        indices,
-        "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
-        bins=len(pmf),
-    )
+    # print(f"First few indices: {indices[:10]}")
+    # draw_histogram(
+    #     indices,
+    #     "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
+    #     bins=len(pmf),
+    # )
 
 
 @hydra.main(config_path="../config", config_name="basic", version_base="1.2")

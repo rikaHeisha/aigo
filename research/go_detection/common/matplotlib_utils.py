@@ -11,13 +11,32 @@ def intensity_to_rgb(intensity: np.ndarray, color_map: str = "plasma") -> np.nda
     return color_map(intensity)[:, :3]  # discard alpha value and only return rgb
 
 
-def draw_histogram(data, fig_path: str, bins: int = 100):
+def draw_histogram(data, fig_path: str | None, bins: int = 100):
     hist, bins = np.histogram(data, bins=bins)
-    hist = hist / hist.sum()
+    hist = 100.0 * hist / hist.sum()
 
     width = 1.0 * (bins[1] - bins[0])
     center = (bins[:-1] + bins[1:]) / 2
 
     fig, ax = plt.subplots()
     ax.bar(center, hist, align="center", width=width)
-    fig.savefig(fig_path)
+
+    if fig_path:
+        fig.savefig(fig_path)
+    else:
+        plt.show()
+
+
+def draw_pmf(pmf, fig_path: str | None):
+    assert pmf.ndim == 1 and np.isclose(pmf.sum(), 1.0)
+    bins = np.linspace(0, pmf.shape[0], num=pmf.shape[0] + 1)
+    width = 1.0 * (bins[1] - bins[0])
+    center = (bins[:-1] + bins[1:]) / 2
+
+    fig, ax = plt.subplots()
+    ax.bar(center, pmf, align="center", width=width)
+
+    if fig_path:
+        fig.savefig(fig_path)
+    else:
+        plt.show()

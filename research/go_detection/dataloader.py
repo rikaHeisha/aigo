@@ -91,9 +91,6 @@ class DistSampler(Sampler):
         self.batch_size = batch_size
         self.indices = list(range(len(self.pmf)))
 
-    # def __len__(self):
-    #     return len(self.pmf)
-
     def sample(self):
         return np.random.choice(self.indices, self.batch_size, replace=True, p=self.pmf)
 
@@ -104,17 +101,20 @@ class DistSampler(Sampler):
                 yield idx
 
 
+class UniformSampler(DistSampler):
+    def __init__(self, length: int, batch_size: int):
+        pmf = np.array([1.0 / length for _ in range(length)])
+        super().__init__(pmf, batch_size)
+
+
 # This is a sampler without replacement
-class InfiniteSampler(Sampler):
-    def __init__(self, length: int, shuffle: bool, repeat: bool):
+class NonReplacementSampler(Sampler):
+    def __init__(self, length: int, shuffle: bool = True, repeat: bool = True):
         super().__init__()
         assert length > 0
         self.length = length
         self.shuffle = shuffle
         self.repeat = repeat
-
-    # def __len__(self):
-    #     return self.length
 
     def __iter__(self):
         order = list(range(self.length))
@@ -388,7 +388,7 @@ def load_datasets(
         train_dataset,
         batch_size=cfg.train_batch_size,
         # shuffle=True,
-        sampler=InfiniteSampler(len(train_dataset), True, False),
+        sampler=NonReplacementSampler(len(train_dataset), True, False),
         collate_fn=custom_collate_fn,
         # num_workers=4,
         # multiprocessing_context="spawn",
@@ -397,7 +397,7 @@ def load_datasets(
     test_dataloader = DataLoader(
         test_dataset,
         batch_size=cfg.test_batch_size,
-        sampler=InfiniteSampler(len(test_dataset), False, False),
+        sampler=NonReplacementSampler(len(test_dataset), False, False),
         collate_fn=custom_collate_fn,
         # num_workers=4,
         # multiprocessing_context="spawn",
