@@ -7,4 +7,4 @@
 export PROJECT_ROOT_DIR=$( cd "$( dirname -- "${BASH_SOURCE[0]}" )/.." &> /dev/null && pwd )
 export PYTHONPATH="$PROJECT_ROOT_DIR"
 
-echo "Finished setting up"
+# echo "Finished setting up"
