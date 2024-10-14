@@ -17,6 +17,8 @@ data_cfg:
   train_batch_size: 20
   test_batch_size: 20
 
+  train_sampler_type: non_replacement
+
 model_cfg:
   optimizer_type: "adam"
   optimizer_weight_decay: 0.0

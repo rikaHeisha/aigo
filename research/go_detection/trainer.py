@@ -188,6 +188,7 @@ class GoTrainer:
 
         # Create the dataloader and load checkpoint
         self.train_dataloader, self.test_dataloader = self._load_or_create_dataloader()
+        self.train_dataloader_iter = iter(self.train_dataloader)
         self.load_checkpoint()
 
         # Create losses
@@ -580,8 +581,9 @@ class GoTrainer:
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
 
-        for idx, datapoints in enumerate(self.train_dataloader, 1):
-            datapoints = cast(DataPoints, datapoints)
+        num_mini_steps = 20
+        for idx in range(1, num_mini_steps):
+            datapoints = cast(DataPoints, next(self.train_dataloader_iter))
             model_output = self.model(datapoints.images)
             map_metrics = self._calculate_metrics(datapoints, model_output)
 
@@ -590,7 +592,7 @@ class GoTrainer:
                 f'Exp: {self.cfg.result_cfg.name}, Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"]:.2f} GB, total_loss: {map_metrics["total_loss"]:.4f}'
             )
 
-            mini_batch_idx = (self.iter - 1) * len(self.train_dataloader) + idx
+            mini_batch_idx = (self.iter - 1) * num_mini_steps + idx
             self._upload_metrics_to_tf(
                 mini_batch_idx, map_metrics, "step__"
             )  # TODO(rishi): add a config for this so we dont push every tick?

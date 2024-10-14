@@ -372,6 +372,62 @@ class GoDynamicDataset(Dataset):
         return data_point.cuda()
 
 
+def _create_sampler(
+    sampler_type: str, dataset: GoDataset | GoDynamicDataset, batch_size: int
+):
+    assert sampler_type in [
+        "non_replacement",
+        "uniform",
+        "dist_equal",
+    ], f"Unknown train sampler type: {sampler_type}"
+
+    if sampler_type == "non_replacement":
+        return NonReplacementSampler(len(dataset), True, True)
+    elif sampler_type == "uniform":
+        return UniformSampler(len(dataset), batch_size)
+    elif sampler_type == "dist_equal":
+        total_possibilities = (
+            19 * 19 + 1
+        )  # Note: This may only work for fixed board sizes. How to handle other go board sizes?
+
+        # calculate the pmf of the dataset
+        list_num_pieces = []
+        for i in range(len(dataset)):
+            num_pieces = dataset.num_pieces[i].item()
+            list_num_pieces.append(num_pieces)
+        list_num_pieces = np.array(list_num_pieces)
+
+        hist, _ = np.histogram(
+            list_num_pieces, bins=np.arange(0, total_possibilities + 1)
+        )
+        original_pmf = hist / hist.sum()
+        # original_cdf = np.cumsum(original_pmf)
+
+        original_pmf[original_pmf == 0.0] = np.inf
+        weights = 1.0 / original_pmf
+
+        weights_per_image = []
+        for i in range(len(dataset)):
+            num_pieces = dataset.num_pieces[i].item()
+            weights_per_image.append(weights[num_pieces])
+        weights_per_image = np.array(weights_per_image)
+
+        sample_pmf = weights_per_image / weights_per_image.sum()
+
+        # verify that the sample pmf results in uniform distribution sampling
+        verify_values = [0.0 for _ in range(total_possibilities)]
+        for i in range(len(dataset)):
+            num_pieces = dataset.num_pieces[i].item()
+            verify_values[num_pieces] += sample_pmf[i]
+        verify_values = np.array(verify_values)
+        non_null = verify_values[verify_values != 0.0]
+        assert np.isclose(
+            non_null, non_null[0]
+        ).all()  # All the values should be equal to each other
+
+        return DistSampler(sample_pmf, batch_size)
+
+
 def load_datasets(
     cfg: DataCfg,
     train_datapoint_paths: List[DataPointPath],
@@ -384,11 +440,15 @@ def load_datasets(
         train_dataset = GoDataset(train_datapoint_paths, cfg.base_path)
         test_dataset = GoDataset(test_datapoint_paths, cfg.base_path)
 
+    train_sampler = _create_sampler(
+        cfg.train_sampler_type, train_dataset, cfg.train_batch_size
+    )
+
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=cfg.train_batch_size,
         # shuffle=True,
-        sampler=NonReplacementSampler(len(train_dataset), True, False),
+        sampler=train_sampler,
         collate_fn=custom_collate_fn,
         # num_workers=4,
         # multiprocessing_context="spawn",

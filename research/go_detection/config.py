@@ -15,7 +15,16 @@ class DataCfg:
     train_batch_size: int = 4
     test_batch_size: int = 1
 
+    train_sampler_type: str = "non_replacement"
+
     _target_: str = f"{__module__}.{__qualname__}"
+
+    def __post_init__(self):
+        assert self.train_sampler_type in [
+            "non_replacement",
+            "uniform",
+            "dist_equal",  # use an arbitrary distribution so that the resulting dataset is uniform (across number of pieces)
+        ], f"Unsuported train sampler type: {self.train_sampler_type}"
 
     def get_asset_io(self) -> AssetIO:
         return AssetIO(self.base_path)
