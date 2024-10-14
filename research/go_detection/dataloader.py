@@ -85,34 +85,36 @@ class DataPoints:
 
 
 class DistSampler(Sampler):
-    def __init__(self, pmf: List[int], repeat: bool):
+    def __init__(self, pmf: List[int], batch_size: int):
+        super().__init__()
         self.pmf = pmf
-        self.repeat = repeat
+        self.batch_size = batch_size
+        self.indices = list(range(len(self.pmf)))
 
     # def __len__(self):
     #     return len(self.pmf)
 
-    def __iter__(self):
-        indices = list(range(len(self.pmf)))
+    def sample(self):
+        return np.random.choice(self.indices, self.batch_size, replace=True, p=self.pmf)
 
+    def __iter__(self):
         while True:
-            order = np.random.choice(indices, len(indices), replace=True, p=self.pmf)
+            order = self.sample()
             for idx in order:
                 yield idx
 
-            if not self.repeat:
-                return
 
-
+# This is a sampler without replacement
 class InfiniteSampler(Sampler):
     def __init__(self, length: int, shuffle: bool, repeat: bool):
+        super().__init__()
         assert length > 0
         self.length = length
         self.shuffle = shuffle
         self.repeat = repeat
 
-    def __len__(self):
-        return self.length
+    # def __len__(self):
+    #     return self.length
 
     def __iter__(self):
         order = list(range(self.length))

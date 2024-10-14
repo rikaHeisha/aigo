@@ -9,8 +9,9 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from go_detection.common.asset_io import AssetIO
+from go_detection.common.matplotlib_utils import draw_histogram
 from go_detection.config import SimCfg
-from go_detection.dataloader import DataPoint, DataPoints, create_datasets
+from go_detection.dataloader import DataPoint, DataPoints, DistSampler, create_datasets
 from go_detection.dataloader_viz import visualize_accuracy_over_num_pieces
 from go_detection.trainer import GoTrainer
 from hydra.core.config_store import ConfigStore
@@ -27,21 +28,39 @@ def do_main(cfg: SimCfg):
 
     # t = np.arange(0.0, 2.0, 0.01)
 
-    data = [
-        (5, 0.7),
-        (5, 0.6),
-        (1, 0.9),
-        (1, 0.8),
-        (3, 0.1),
-        (2, 0.2),
-        (2, 0.3),
-        (4, 0.5),
-    ]
-    visualize_accuracy_over_num_pieces(
-        data, "/home/rmenon/Desktop/dev/projects/aigo/test.png"
-    )
+    # data = [
+    #     (5, 0.7),
+    #     (5, 0.6),
+    #     (1, 0.9),
+    #     (1, 0.8),
+    #     (3, 0.1),
+    #     (2, 0.2),
+    #     (2, 0.3),
+    #     (4, 0.5),
+    # ]
+    # visualize_accuracy_over_num_pieces(
+    #     data, "/home/rmenon/Desktop/dev/projects/aigo/test.png"
+    # )
 
-    # plt.show()
+    # # plt.show()
+
+    weights = np.array([1, 2, 2, 4])
+    pmf = weights / weights.sum()
+
+    sampler = DistSampler(pmf, 3)
+    sampler_iter = iter(sampler)
+
+    indices = []
+    for _ in range(1000):
+        idx = next(sampler_iter)
+        indices.append(idx)
+
+    print(f"First few indices: {indices[:10]}")
+    draw_histogram(
+        indices,
+        "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
+        bins=len(pmf),
+    )
 
 
 @hydra.main(config_path="../config", config_name="basic", version_base="1.2")
