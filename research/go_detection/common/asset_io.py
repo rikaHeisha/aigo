@@ -29,7 +29,7 @@ class AssetIO:
     def mkdir(self, rel_path: str = ""):
         os.makedirs(self._abs(rel_path), exist_ok=True)
 
-    def cd(self, rel_path: str):
+    def cd(self, rel_path: str) -> "AssetIO":
         if rel_path == "":
             return self
 

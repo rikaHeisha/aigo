@@ -196,6 +196,36 @@ def visualize_accuracy_over_num_pieces(data, fig_path: str):
     plt.close(fig)
 
 
+def visualize_dataset_dist(
+    xs_num_pieces, xs_images, sampling, pmf, cdf, fig_path: str | None
+):
+
+    fig, axes = plt.subplots(
+        1,
+        3,
+        # gridspec_kw={"wspace": 1, "hspace": 0},
+        figsize=(3.5 * 4, 1 * 4),
+    )
+
+    fig.tight_layout(rect=(0.02, 0.02, 0.97, 0.97))
+
+    axes[0].bar(xs_images, sampling, align="edge", width=1.0)
+    axes[0].set_title("Sampling Distribution")
+
+    axes[1].bar(xs_num_pieces, pmf, align="edge", width=1.0)
+    axes[1].set_title("PMF Of Num Pieces")
+
+    axes[2].bar(xs_num_pieces, cdf, align="edge", width=1.0)
+    axes[2].set_title("CDF Of Num Pieces")
+
+    if fig_path:
+        fig.savefig(fig_path)
+    else:
+        plt.show()
+
+    plt.close(fig)
+
+
 def visualize_grid_plotly(
     data_points: DataPoints,
     output_path: str,

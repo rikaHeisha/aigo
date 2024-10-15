@@ -12,6 +12,7 @@ from typing import Dict, List, Literal, Optional, Tuple, TypeVar, Union, cast
 import numpy as np
 import torch
 from go_detection.common.asset_io import AssetIO
+from go_detection.common.matplotlib_utils import draw_bar
 from go_detection.config import DataCfg, SimCfg
 from go_detection.dataloader import (
     DataPoint,
@@ -24,6 +25,7 @@ from go_detection.dataloader import (
 )
 from go_detection.dataloader_viz import (
     visualize_accuracy_over_num_pieces,
+    visualize_dataset_dist,
     visualize_grid,
 )
 from go_detection.model import GoModel
@@ -467,7 +469,74 @@ class GoTrainer:
             render_grid=render_grid,
         )
 
+    def _do_render_dataset_properties(self, dataloader, rel_path: str):
+
+        asset_io = self.results_io.cd(rel_path)
+        asset_io.mkdir("")
+
+        dataset, sampler = dataloader.dataset, dataloader.sampler
+        dataset = cast(GoDynamicDataset | GoDataset, dataset)
+
+        total_possibilities = 19 * 19 + 1
+        data = dataset.num_pieces
+        hist, bins = np.histogram(data, bins=np.arange(0, total_possibilities + 1))
+
+        xs_num_pieces = bins[:-1]
+        xs_images = np.arange(0, len(dataset))
+        original_sampling = np.ones(len(dataset)) / len(dataset)
+        original_pmf = hist / hist.sum()
+        original_cdf = np.cumsum(original_pmf)
+
+        visualize_dataset_dist(
+            xs_num_pieces,
+            xs_images,
+            original_sampling,
+            original_pmf,
+            original_cdf,
+            asset_io.get_abs("original_dist.png"),
+        )
+
+        sampler_iter = iter(sampler)
+        data_sampled_point = np.zeros(len(dataset))
+        data_num_pieces = np.zeros(total_possibilities)
+        for _ in range(10**6):
+            try:
+                idx = next(sampler_iter)
+            except StopIteration:
+                break
+
+            data_sampled_point[idx] += 1
+            num_pieces = dataset.num_pieces[idx]
+            data_num_pieces[num_pieces] += 1
+
+        data_sampled_point = data_sampled_point[np.argsort(dataset.num_pieces)]
+
+        actual_sampling = data_sampled_point / data_sampled_point.sum()
+        actual_pmf = data_num_pieces / data_num_pieces.sum()
+        actual_cdf = np.cumsum(actual_pmf)
+
+        visualize_dataset_dist(
+            xs_num_pieces,
+            xs_images,
+            actual_sampling,
+            actual_pmf,
+            actual_cdf,
+            asset_io.get_abs("actual_dist.png"),
+        )
+
+    def render_dataset_properties(self):
+        self._do_render_dataset_properties(
+            self.train_dataloader, path.join("dataset_properties", "train")
+        )
+
+        self._do_render_dataset_properties(
+            self.test_dataloader, path.join("dataset_properties", "test")
+        )
+        logger.info("Finished generating dataset properties")
+
     def start(self):
+        self.render_dataset_properties()
+
         logging.info("Starting training")
 
         # self.evaluate(
