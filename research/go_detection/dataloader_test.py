@@ -40,9 +40,9 @@ def test_dist_sampler():
     weights = np.array([1, 2, 2, 4, 1])
     pmf = weights / weights.sum()
 
-    sampler = DistSampler(pmf, 10**6)
+    sampler = DistSampler(pmf)
     # Verify if the sampled distribution is close to pmf
-    indices = sampler.sample()
+    indices = sampler.sample(10**6)
     _, counts = np.unique(indices, return_counts=True)
     counts = counts / counts.sum()
     assert np.isclose(pmf, counts, atol=1e-3).all()

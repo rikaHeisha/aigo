@@ -85,18 +85,19 @@ class DataPoints:
 
 
 class DistSampler(Sampler):
-    def __init__(self, pmf: List[int], batch_size: int):
+    def __init__(self, pmf: List[int]):
         super().__init__()
         self.pmf = pmf
-        self.batch_size = batch_size
         self.indices = list(range(len(self.pmf)))
 
-    def sample(self):
-        return np.random.choice(self.indices, self.batch_size, replace=True, p=self.pmf)
+    def sample(self, requested_sample_size: int):
+        return np.random.choice(
+            self.indices, requested_sample_size, replace=True, p=self.pmf
+        )
 
     def __iter__(self):
         while True:
-            order = self.sample()
+            order = self.sample(len(self.pmf))
             for idx in order:
                 yield idx
 
@@ -116,12 +117,17 @@ class NonReplacementSampler(Sampler):
         self.shuffle = shuffle
         self.repeat = repeat
 
-    def __iter__(self):
+    def sample(self, requested_sample_size: int):
         order = list(range(self.length))
-        while True:
-            if self.shuffle:
-                random.shuffle(order)
+        if self.shuffle:
+            random.shuffle(order)
 
+        batch_size = min(requested_sample_size, self.length)
+        return order[0:batch_size]
+
+    def __iter__(self):
+        while True:
+            order = self.sample(self.length)
             for idx in order:
                 yield idx
 
@@ -372,9 +378,7 @@ class GoDynamicDataset(Dataset):
         return data_point.cuda()
 
 
-def _create_sampler(
-    sampler_type: str, dataset: GoDataset | GoDynamicDataset, batch_size: int
-):
+def _create_sampler(sampler_type: str, dataset: GoDataset | GoDynamicDataset):
     assert sampler_type in [
         "non_replacement",
         "uniform",
@@ -384,7 +388,7 @@ def _create_sampler(
     if sampler_type == "non_replacement":
         return NonReplacementSampler(len(dataset), True, True)
     elif sampler_type == "uniform":
-        return UniformSampler(len(dataset), batch_size)
+        return UniformSampler(len(dataset))
     elif sampler_type == "dist_equal":
         total_possibilities = (
             19 * 19 + 1
@@ -425,7 +429,7 @@ def _create_sampler(
             non_null, non_null[0]
         ).all()  # All the values should be equal to each other
 
-        return DistSampler(sample_pmf, batch_size)
+        return DistSampler(sample_pmf)
 
 
 def load_datasets(
@@ -440,9 +444,7 @@ def load_datasets(
         train_dataset = GoDataset(train_datapoint_paths, cfg.base_path)
         test_dataset = GoDataset(test_datapoint_paths, cfg.base_path)
 
-    train_sampler = _create_sampler(
-        cfg.train_sampler_type, train_dataset, cfg.train_batch_size
-    )
+    train_sampler = _create_sampler(cfg.train_sampler_type, train_dataset)
 
     train_dataloader = DataLoader(
         train_dataset,

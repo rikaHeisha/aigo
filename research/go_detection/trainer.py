@@ -496,18 +496,16 @@ class GoTrainer:
             asset_io.get_abs("original_dist.png"),
         )
 
-        sampler_iter = iter(sampler)
+        samples = sampler.sample(10**6)
         data_sampled_point = np.zeros(len(dataset))
-        data_num_pieces = np.zeros(total_possibilities)
-        for _ in range(10**6):
-            try:
-                idx = next(sampler_iter)
-            except StopIteration:
-                break
+        uniq, freq = np.unique(samples, return_counts=True)
+        data_sampled_point[uniq] += freq
+        assert data_sampled_point.shape == (len(dataset),)
 
-            data_sampled_point[idx] += 1
-            num_pieces = dataset.num_pieces[idx]
-            data_num_pieces[num_pieces] += 1
+        data_num_pieces = np.zeros(total_possibilities)
+        uniq, freq = np.unique(dataset.num_pieces[samples], return_counts=True)
+        data_num_pieces[uniq] += freq
+        assert data_num_pieces.shape == (total_possibilities,)
 
         data_sampled_point = data_sampled_point[np.argsort(dataset.num_pieces)]
 
