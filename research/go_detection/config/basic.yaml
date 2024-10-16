@@ -4,10 +4,11 @@ defaults:
   - _self_
 
 exp_name: basic
-iters: 100
-i_weight:  2
-i_eval: 10
+iters: 10000
+i_weight: 100
+i_eval: 2000
 i_print: 1
+i_tf_writer: 20
 
 data_cfg:
   base_path: /home/rmenon/Desktop/dev/datasets/go_board/dataset

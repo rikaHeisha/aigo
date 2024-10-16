@@ -98,8 +98,7 @@ class DistSampler(Sampler):
     def __iter__(self):
         while True:
             order = self.sample(len(self.pmf))
-            for idx in order:
-                yield idx
+            yield from order
 
 
 class UniformSampler(DistSampler):
@@ -128,8 +127,7 @@ class NonReplacementSampler(Sampler):
     def __iter__(self):
         while True:
             order = self.sample(self.length)
-            for idx in order:
-                yield idx
+            yield from order
 
             if not self.repeat:
                 return

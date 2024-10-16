@@ -189,7 +189,7 @@ def visualize_accuracy_over_num_pieces(data, fig_path: str):
     ax.set(
         xlabel="Number Of Pieces",
         ylabel="Accuracy (%)",
-        title="Accuracy Over Number Of Pieces",
+        title="Accuracy Distribution",
     )
     ax.grid()
     fig.savefig(fig_path)

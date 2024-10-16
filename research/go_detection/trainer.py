@@ -418,17 +418,6 @@ class GoTrainer:
         report_data["overall"] = {}
         report_data["overall"]["accuracy"] = sum(list_accuracy) / len(list_accuracy)
 
-        # Draw plot of accuracy over num_pieces
-        map_num_pieces_accuracy = defaultdict(list)
-        for image_name, value in report_data.items():
-            if image_name == "overall":
-                continue
-            map_num_pieces_accuracy[value["num_pieces"]].append(value["accuracy"])
-
-        map_num_pieces_accuracy = {
-            k: sum(v) / len(v) for k, v in map_num_pieces_accuracy.items()
-        }
-
         # this gets stored to yaml
         report_data_sanitized = {}
         for image_name, value in report_data.items():
@@ -554,20 +543,22 @@ class GoTrainer:
 
         while self.iter <= self.cfg.iters:
             last_iter = self.iter == self.cfg.iters
+            first_iter = self.iter == 1
+
             output_map = self.train_step()
             eval_output_map = None
-            if self.iter % self.cfg.i_tf_writer == 0 or last_iter:
+            if self.iter % self.cfg.i_tf_writer == 0 or last_iter or first_iter:
                 eval_output_map = self.eval_step()
 
-            if self.iter % self.cfg.i_print == 0 or last_iter:
+            if self.iter % self.cfg.i_print == 0 or last_iter or first_iter:
                 logger.info(
                     f'Exp: {self.cfg.result_cfg.name}, Iter: {self.iter} / {self.cfg.iters}, Memory: {output_map["memory"]:.2f} GB, total_loss: {output_map["total_loss"]:.4f}'
                 )
 
-            if self.iter % self.cfg.i_weight == 0 or last_iter:
+            if self.iter % self.cfg.i_weight == 0 or last_iter or first_iter:
                 self.save_checkpoint()
 
-            if self.iter % self.cfg.i_tf_writer == 0 or last_iter:
+            if self.iter % self.cfg.i_tf_writer == 0 or last_iter or first_iter:
                 # Upload the output_map of the last mini batch
                 self._upload_metrics_to_tf(self.iter, output_map, "epoch__")
 
@@ -648,21 +639,21 @@ class GoTrainer:
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
 
-        num_mini_steps = 20
-        for idx in range(1, num_mini_steps):
+        num_mini_steps = 1
+        for idx in range(1, num_mini_steps + 1):
             datapoints = cast(DataPoints, next(self.train_dataloader_iter))
             model_output = self.model(datapoints.images)
             map_metrics = self._calculate_metrics(datapoints, model_output)
 
             # Use print so this does not end up in the logs
-            print(
-                f'Exp: {self.cfg.result_cfg.name}, Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"]:.2f} GB, total_loss: {map_metrics["total_loss"]:.4f}'
-            )
+            # print(
+            #     f'Exp: {self.cfg.result_cfg.name}, Step: {self.iter}-{idx} / {self.cfg.iters}, Memory: {map_metrics["memory"]:.2f} GB, total_loss: {map_metrics["total_loss"]:.4f}'
+            # )
 
-            mini_batch_idx = (self.iter - 1) * num_mini_steps + idx
-            self._upload_metrics_to_tf(
-                mini_batch_idx, map_metrics, "step__"
-            )  # TODO(rishi): add a config for this so we dont push every tick?
+            # mini_batch_idx = (self.iter - 1) * num_mini_steps + idx
+            # self._upload_metrics_to_tf(
+            #     mini_batch_idx, map_metrics, "step__"
+            # )  # TODO(rishi): add a config for this so we dont push every tick?
 
             self.optimizer.zero_grad(set_to_none=True)
             map_metrics["total_loss"].base_value.backward()

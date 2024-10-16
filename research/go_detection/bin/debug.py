@@ -34,68 +34,6 @@ def do_main(cfg: SimCfg):
     train, test = create_datasets(cfg.data_cfg)
     train_dataset, test_dataset = train.dataset, test.dataset
 
-    def draw_hist_with_sampler(sampler, fig_path, num_samples):
-        data = []
-        for _ in range(num_samples):
-            idx = next(sampler_iter)
-            data.append(train_dataset.num_pieces[idx].item())
-        data = np.array(data)
-        draw_histogram(
-            data,
-            fig_path,
-            bins=data.max(),
-        )
-
-    sampler_iter = iter(NonReplacementSampler(len(train_dataset), False))
-    draw_hist_with_sampler(
-        sampler_iter,
-        "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
-        len(train_dataset),
-    )
-
-    sampler_iter = iter(UniformSampler(len(train_dataset), 1000))
-    draw_hist_with_sampler(
-        sampler_iter,
-        "/home/rmenon/Desktop/dev/projects/aigo/research/rishi_2.png",
-        10**6,
-    )
-
-    # t = np.arange(0.0, 2.0, 0.01)
-
-    # data = [
-    #     (5, 0.7),
-    #     (5, 0.6),
-    #     (1, 0.9),
-    #     (1, 0.8),
-    #     (3, 0.1),
-    #     (2, 0.2),
-    #     (2, 0.3),
-    #     (4, 0.5),
-    # ]
-    # visualize_accuracy_over_num_pieces(
-    #     data, "/home/rmenon/Desktop/dev/projects/aigo/test.png"
-    # )
-
-    # # plt.show()
-    # #######################
-    # weights = np.array([1, 2, 2, 4])
-    # pmf = weights / weights.sum()
-
-    # sampler = DistSampler(pmf, 3)
-    # sampler_iter = iter(sampler)
-
-    # indices = []
-    # for _ in range(1000):
-    #     idx = next(sampler_iter)
-    #     indices.append(idx)
-
-    # print(f"First few indices: {indices[:10]}")
-    # draw_histogram(
-    #     indices,
-    #     "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
-    #     bins=len(pmf),
-    # )
-
 
 @hydra.main(config_path="../config", config_name="basic", version_base="1.2")
 def main(cfg):
