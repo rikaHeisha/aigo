@@ -181,7 +181,8 @@ def visualize_accuracy_over_num_pieces(data, fig_path: str):
     accuracy_points = np.array(
         [(k, sum(v) / len(v)) for k, v in map_num_piece_to_accuracy.items()]
     )
-    accuracy_points = np.sort(accuracy_points, axis=0)
+    sort_idx = accuracy_points[:, 0].argsort()
+    accuracy_points = accuracy_points[sort_idx]
 
     fig, ax = plt.subplots()
     ax.plot(accuracy_points[:, 0], 100.0 * accuracy_points[:, 1])

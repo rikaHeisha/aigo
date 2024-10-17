@@ -34,6 +34,39 @@ def do_main(cfg: SimCfg):
     train, test = create_datasets(cfg.data_cfg)
     train_dataset, test_dataset = train.dataset, test.dataset
 
+    # base_path = (
+    #     "/home/rmenon/Desktop/dev/ml_results/aigo_results/go2_basic_adam_1016/results/"
+    # )
+    # # full_eval/test/plot_accuracy.png
+    # paths = [
+    #     "full_eval",
+    #     "iter_02000",
+    #     "iter_04000",
+    #     "iter_06000",
+    #     "iter_08000",
+    # ]
+    # for path_iter in paths:
+    #     for eval_type in ["train", "test"]:
+    #         aio = AssetIO(os.path.join(base_path, path_iter, eval_type))
+    #         report_data = aio.load_yaml("report.yaml")
+
+    #         # points = [
+    #         #     (v["num_pieces"], float(v["accuracy"].partition(" %")[0]) / 100.0)
+    #         #     for k, v in report_data.items()
+    #         #     if k != "overall"
+    #         # ]
+    #         points = []
+    #         for k, v in report_data.items():
+    #             if k != "overall":
+    #                 points.append(
+    #                     (
+    #                         v["num_pieces"],
+    #                         float(v["accuracy"].partition(" %")[0]) / 100.0,
+    #                     )
+    #                 )
+
+    #         visualize_accuracy_over_num_pieces(points, aio.get_abs("plot_accuracy.png"))
+
 
 @hydra.main(config_path="../config", config_name="basic", version_base="1.2")
 def main(cfg):
