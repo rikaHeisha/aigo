@@ -194,7 +194,6 @@ class GoTrainer:
         self.load_checkpoint()
 
         # Create losses
-        self.nll_loss = nn.NLLLoss(reduction="mean")
 
     def _load_or_create_dataloader(self):
 
@@ -601,14 +600,27 @@ class GoTrainer:
         num_images = datapoints.images.shape[0]
         gt_labels = datapoints.labels.reshape(num_images, -1)
 
-        # Check that the shape matches what we are giving to self.nll_loss
+        # Check that the shape matches what we are giving to nll_loss
         assert (
             gt_labels.shape[1:] == model_output.shape[2:]
             and gt_labels.shape[0] == num_images
             and model_output.shape[0] == num_images
         )
         assert gt_labels.max() < model_output.shape[1] and gt_labels.min() >= 0
-        nll_loss = self.nll_loss(model_output, gt_labels)
+
+        if self.cfg.loss_cfg.nll_loss_weights is not None:
+            nll_weights = torch.tensor(
+                self.cfg.loss_cfg.nll_loss_weights, device=model_output.device
+            )
+            # nll_weights = nll_weights / nll_weights.sum()
+            assert (
+                nll_weights.dim() == 1 and nll_weights.shape[0] == model_output.shape[1]
+            ), f"Expected nll_weights to have {model_output.shape[1]} elements, received {nll_weights.shape[0]}"
+        else:
+            nll_weights = None
+
+        nll_loss = nn.functional.nll_loss(model_output, gt_labels, weight=nll_weights)
+
         # Manuall calculate the NLL loss for verifying
         # target_label_one_hot = torch.nn.functional.one_hot(gt_labels, model_output.shape[1])
         # nll_loss_2 = (-model_output * target_label_one_hot.transpose(1,2)).sum(dim=1).mean()

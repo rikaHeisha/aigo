@@ -24,6 +24,9 @@ model_cfg:
   optimizer_type: "sgd"
   optimizer_weight_decay: 0.0
 
+loss_cfg:
+  # order: black, empty, white
+  nll_loss_weights: [5, 1, 5]
 result_cfg:
   dir: /home/rmenon/Desktop/dev/ml_results/aigo_results
   eval_cfg:

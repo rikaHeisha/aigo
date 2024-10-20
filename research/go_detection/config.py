@@ -56,6 +56,7 @@ class ResultCfg:
 
 @dataclass
 class ModelCfg:
+    # TODO(rishi): move this to LossCfg
     optimizer_type: str = "adam"  # Can either be "adam" or "sgd"
     optimizer_weight_decay: float = 0.0
 
@@ -69,10 +70,17 @@ class ModelCfg:
 
 
 @dataclass
+class LossCfg:
+    # nll_loss_lambda: float = 1.0
+    nll_loss_weights: Optional[List[float]] = None
+
+
+@dataclass
 class SimCfg:
     data_cfg: DataCfg
     model_cfg: ModelCfg
     result_cfg: ResultCfg
+    loss_cfg: LossCfg
 
     exp_name: str
     iters: int
