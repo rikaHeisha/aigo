@@ -21,7 +21,7 @@ data_cfg:
   train_sampler_type: non_replacement
 
 model_cfg:
-  optimizer_type: "adam"
+  optimizer_type: "sgd"
   optimizer_weight_decay: 0.0
 
 result_cfg:

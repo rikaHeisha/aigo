@@ -593,7 +593,9 @@ class GoTrainer:
         )
         self.tf_writer.flush()
 
-    def _calculate_metrics(self, datapoints: DataPoints, model_output: torch.Tensor):
+    def _calculate_metrics_and_loss(
+        self, datapoints: DataPoints, model_output: torch.Tensor
+    ):
         map_metrics: Dict[str, MetricValue] = {}
 
         num_images = datapoints.images.shape[0]
@@ -643,7 +645,7 @@ class GoTrainer:
         for idx in range(1, num_mini_steps + 1):
             datapoints = cast(DataPoints, next(self.train_dataloader_iter))
             model_output = self.model(datapoints.images)
-            map_metrics = self._calculate_metrics(datapoints, model_output)
+            map_metrics = self._calculate_metrics_and_loss(datapoints, model_output)
 
             # Use print so this does not end up in the logs
             # print(
@@ -683,7 +685,7 @@ class GoTrainer:
             for idx, datapoints in enumerate(self.test_dataloader, 1):
                 datapoints = cast(DataPoints, datapoints)
                 model_output = self.model(datapoints.images)
-                map_metrics = self._calculate_metrics(datapoints, model_output)
+                map_metrics = self._calculate_metrics_and_loss(datapoints, model_output)
 
                 for matric_name, metric in map_metrics.items():
                     aggregated_map_metrics[matric_name].append(metric)
