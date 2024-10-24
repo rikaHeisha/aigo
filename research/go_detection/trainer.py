@@ -612,20 +612,23 @@ class GoTrainer:
             nll_weights = torch.tensor(
                 self.cfg.loss_cfg.nll_loss_weights, device=model_output.device
             )
-            # nll_weights = nll_weights / nll_weights.sum()
-            assert (
-                nll_weights.dim() == 1 and nll_weights.shape[0] == model_output.shape[1]
-            ), f"Expected nll_weights to have {model_output.shape[1]} elements, received {nll_weights.shape[0]}"
         else:
-            nll_weights = None
+            nll_weights = torch.ones(model_output.shape[1], device=model_output.device)
 
-        nll_loss = nn.functional.nll_loss(model_output, gt_labels, weight=nll_weights)
+        assert (
+            nll_weights.dim() == 1 and nll_weights.shape[0] == model_output.shape[1]
+        ), f"Expected nll_weights to have {model_output.shape[1]} elements, received {nll_weights.shape[0]}"
 
-        # Manuall calculate the NLL loss for verifying
-        # target_label_one_hot = torch.nn.functional.one_hot(gt_labels, model_output.shape[1])
-        # nll_loss_2 = (-model_output * target_label_one_hot.transpose(1,2)).sum(dim=1).mean()
+        # nll_loss = nn.functional.nll_loss(model_output, gt_labels, weight=nll_weights)
+        # Manually calculate the NLL loss for verifying
+        target_label_one_hot = torch.nn.functional.one_hot(
+            gt_labels, model_output.shape[1]
+        ).transpose(1, 2)
+        nll_loss_per_tile = (-model_output * target_label_one_hot).sum(dim=1)
+        weights_per_tile = nll_weights[gt_labels]
+        nll_loss = (nll_loss_per_tile * weights_per_tile).mean()
+
         map_metrics["nll_loss"] = MetricValue(nll_loss, 1.0)
-
         # We have finished calculating all the losses. Calculate total loss now
         total_loss = torch.tensor(0.0).cuda()
         for metric_name, metric in map_metrics.items():
