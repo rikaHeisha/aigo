@@ -3,7 +3,7 @@ defaults:
   - sim_cfg_default
   - _self_
 
-exp_name: basic
+exp_name: temp
 iters: 10000
 i_weight: 100
 i_eval: 2000

@@ -152,18 +152,18 @@ class GoTrainer:
 
         # Create the tf writer
         self.results_io = cfg.result_cfg.get_asset_io()
-        self.results_io.mkdir("tf")
+        self.results_io.mkdir("exp_info/tf")
 
         # Calculate the run number
         existing_run_files = [
-            int(_.removeprefix("tf/run_"))
-            for _ in self.results_io.ls("tf")
+            int(_.removeprefix("exp_info/tf/run_"))
+            for _ in self.results_io.ls("exp_info/tf")
             if self.results_io.has_dir(_)
         ]
         # run_number = len(existing_run_files) + 1 # Naive solution
         run_number = (max(existing_run_files) + 1) if existing_run_files != [] else 1
 
-        tf_path = path.join("tf", f"run_{run_number}")
+        tf_path = path.join("exp_info", "tf", f"run_{run_number}")
         assert self.results_io.has(tf_path) == False
         self.results_io.mkdir(tf_path)
         self.tf_writer = SummaryWriter(self.results_io.get_abs(tf_path))
@@ -458,7 +458,6 @@ class GoTrainer:
         )
 
     def _do_render_dataset_properties(self, dataloader, rel_path: str):
-
         asset_io = self.results_io.cd(rel_path)
         asset_io.mkdir("")
 
@@ -512,11 +511,11 @@ class GoTrainer:
 
     def render_dataset_properties(self):
         self._do_render_dataset_properties(
-            self.train_dataloader, path.join("dataset_properties", "train")
+            self.train_dataloader, path.join("exp_info", "dataset_properties", "train")
         )
 
         self._do_render_dataset_properties(
-            self.test_dataloader, path.join("dataset_properties", "test")
+            self.test_dataloader, path.join("exp_info", "dataset_properties", "test")
         )
         logger.info("Finished generating dataset properties")
 
