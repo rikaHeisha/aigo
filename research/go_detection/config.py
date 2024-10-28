@@ -5,6 +5,14 @@ from typing import List, Literal, Optional, cast
 from go_detection.common.asset_io import AssetIO
 
 
+@dataclass
+class DumpDatasetCfg:
+    base_path: str
+    output_path: str
+
+    _target_: str = f"{__module__}.{__qualname__}"
+
+
 # Fully qaualified class name can be obtained by: <class>.__module__ + "." + <class>.__qualname__
 @dataclass
 class DataCfg:

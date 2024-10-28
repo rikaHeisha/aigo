@@ -11,7 +11,7 @@ i_print: 1
 i_tf_writer: 20
 
 data_cfg:
-  base_path: /home/rmenon/Desktop/dev/datasets/go_board/dataset
+  base_path: /home/rmenon/Desktop/dev/datasets/go_board/dataset_dumped
   train_split_percent: 0.9
   randomize_train_split: True
   use_dynamic_dataset: True

@@ -128,3 +128,13 @@ class AssetIO:
         transform = transforms.ToPILImage()
         pil_img = transform(image)
         pil_img.save(self._abs(rel_path))
+
+    def save_text(self, rel_path: str, lines: str):
+        with open(self._abs(rel_path), "w") as fp:
+            fp.writelines(lines)
+
+    def load_text(self, rel_path: str):
+        with open(self._abs(rel_path), "r") as fp:
+            lines = fp.readlines()
+
+        return lines

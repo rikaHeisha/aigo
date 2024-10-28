@@ -4,6 +4,8 @@ import random
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import IntEnum
+from os import path
 from typing import List, Tuple, cast
 
 import numpy as np
@@ -25,6 +27,11 @@ class DataPointPath:
     image_path: str
     label_path: str
     board_path: str
+
+    @property
+    def has_pt_files(self):
+        has_pt = self.image_path.endswith(".pt")
+        return has_pt
 
 
 @dataclass
@@ -82,6 +89,33 @@ class DataPoints:
             self.labels[index],
             self.board_pts[index],
         )
+
+
+class LabelPieces(IntEnum):
+    BLACK = 0
+    EMPTY = 1
+    WHITE = 2
+
+    @staticmethod
+    def from_str(ch) -> "LabelPieces":
+        if ch in {"B", "b"}:
+            return LabelPieces.BLACK
+        elif ch in {" ", "."}:
+            return LabelPieces.EMPTY
+        elif ch in {"W", "w"}:
+            return LabelPieces.WHITE
+        else:
+            assert False, f"Unknown character: {ch}"
+
+    def to_str(self) -> str:
+        if self == LabelPieces.BLACK:
+            return "B"
+        elif self == LabelPieces.EMPTY:
+            return "."
+        elif self == LabelPieces.WHITE:
+            return "W"
+        else:
+            assert False, f"Unknown enum: {self}"
 
 
 class DistSampler(Sampler):
@@ -151,10 +185,10 @@ def custom_collate_fn(batches) -> DataPoints:
     images = torch.stack(images, dim=0)
     labels = torch.stack(labels, dim=0)
     board_pts = torch.stack(board_pts, dim=0)
-    return DataPoints(images, labels, board_pts)
+    return DataPoints(images, labels, board_pts).cuda()
 
 
-def _read_image(data_io: AssetIO, image_path: str, board_metadata):
+def _read_raw_image(data_io: AssetIO, image_path: str, board_pts: torch.Tensor):
     """
     Returns tuple:
         - resized image
@@ -169,9 +203,6 @@ def _read_image(data_io: AssetIO, image_path: str, board_metadata):
         resize_transform = transforms.Resize(new_size)
         resized_tensor = resize_transform(orig_image)
         return resized_tensor, original_size
-
-    assert "pts_clicks" in board_metadata
-    board_pts = torch.tensor(board_metadata.pts_clicks).float()
 
     center_square = board_pts.mean(dim=0)
     # square_half_length will perfectly keep one dimension. If width is larger, then square_half_length will be half_height of image.
@@ -258,13 +289,13 @@ def _read_image(data_io: AssetIO, image_path: str, board_metadata):
 
 def _read_label(data_io: AssetIO, label_path: str):
     """
-    Returns a tensor where index:
-        Black: 0
-        Empty: 1
-        White: 2
     Returns
-        A tensor of Boardsize x Boardsize x 3
+        A tensor of Boardsize x Boardsize
     """
+
+    if label_path.endswith(".pt"):
+        return data_io.load_torch(label_path)
+
     with open(data_io.get_abs(label_path), "r") as file:
         lines = file.read()
         label = []
@@ -274,16 +305,11 @@ def _read_label(data_io: AssetIO, label_path: str):
 
             label_line = []
             for ch in line.split(" "):
-                if ch.upper() == "B":
-                    digit = 0
-                elif ch == ".":
-                    digit = 1
-                elif ch.upper() == "W":
-                    digit = 2
-                else:
-                    assert (
-                        False
-                    ), f"Unknown character: '{ch}' in line '{line}', file: {label_path}"
+                digit = LabelPieces.from_str(ch.upper())
+                # assert (
+                #     False
+                # ), f"Unknown character: '{ch}' in line '{line}', file: {label_path}"
+
                 label_line.append(digit)
             label.append(label_line)
 
@@ -292,15 +318,25 @@ def _read_label(data_io: AssetIO, label_path: str):
 
 
 def _load_single(data_point: DataPointPath, data_io: AssetIO) -> DataPoint:
-    board_metadata = data_io.load_yaml(data_point.board_path)
+    if data_point.has_pt_files:
+        image = data_io.load_torch(data_point.image_path)
+        label = data_io.load_torch(data_point.label_path)
+        board_pts = data_io.load_torch(data_point.board_path)
 
-    label = _read_label(data_io, data_point.label_path)
-    image, original_size = _read_image(data_io, data_point.image_path, board_metadata)
-    image = image[:3, :, :]  # Remove the alpha channel
-    # board_pt is a list of 4 points. The first point is the top left corner, and then the points are in clockwise order
-    board_pt = torch.tensor(board_metadata.pts_clicks) / original_size
+    else:
+        board_pts = torch.tensor(
+            data_io.load_yaml(data_point.board_path)["pts_clicks"]
+        ).float()
 
-    return DataPoint(image, label, board_pt)
+        label = _read_label(data_io, data_point.label_path)
+        image, original_size = _read_raw_image(
+            data_io, data_point.image_path, board_pts
+        )
+        image = image[:3, :, :]  # Remove the alpha channel
+        # board_pts is a list of 4 points. The first point is the top left corner, and then the points are in clockwise order
+        board_pts = board_pts / original_size
+
+    return DataPoint(image, label, board_pts)
 
 
 def _load(entire_data: List[DataPointPath], data_io: AssetIO, include_logs=True):
@@ -351,7 +387,7 @@ class GoDataset(Dataset):
         data_point = DataPoint(
             self._images[idx], self._labels[idx], self._board_pts[idx]
         )
-        return data_point.cuda()
+        return data_point.cpu()
 
 
 class GoDynamicDataset(Dataset):
@@ -373,7 +409,7 @@ class GoDynamicDataset(Dataset):
 
     def __getitem__(self, idx) -> DataPoint:
         data_point = _load_single(self.datapoint_paths[idx], self._data_io)
-        return data_point.cuda()
+        return data_point.cpu()
 
 
 def _create_sampler(sampler_type: str, dataset: GoDataset | GoDynamicDataset):
@@ -465,28 +501,64 @@ def load_datasets(
     return train_dataloader, test_dataloader
 
 
-def filter_datapoints_train(
-    train_paths: List[DataPointPath],
-    base_path: str,
-) -> List[DataPointPath]:
-    return train_paths
-    # logger.info("filtering sparse training boards")
-    # filtered_paths = []
-    # data_io = AssetIO(base_path)
+def _get_all_datapoints(base_path: str) -> List[List[DataPointPath]]:
+    asset_io = AssetIO(base_path)
+    version = 0
+    if asset_io.has_file("dataset_info.yaml"):
+        dataset_info = asset_io.load_yaml("dataset_info.yaml")
+        version = dataset_info["version"]
 
-    # for data_point in train_paths:
-    #     label = _read_label(data_io, data_point.label_path)
-    #     num_pieces = (label != 1).sum().item()
-    #     if num_pieces > 50:
-    #         filtered_paths.append(data_point)
-
-    # return filtered_paths
+    if version == 0:
+        return _get_all_datapoints_v0(base_path)
+    elif version == 1:
+        return _get_all_datapoints_v1(base_path)
+    else:
+        assert False, f"Unknown version: {version}"
 
 
-def create_datasets_split(
-    cfg: DataCfg,
-) -> Tuple[List[DataPointPath], List[DataPointPath]]:
-    data_io = AssetIO(cfg.base_path)
+def _get_all_datapoints_v1(base_path: str) -> List[List[DataPointPath]]:
+    use_pt_files = True
+
+    data_io = AssetIO(base_path)
+    board_dirs = sorted(data_io.ls())
+    entire_data: List[List[DataPointPath]] = []
+    for board_dir in board_dirs:
+        if not data_io.has_dir(board_dir):
+            continue
+
+        datapoint_paths = []
+        image_dirs = data_io.ls(board_dir)
+        for image_dir in image_dirs:
+            files = data_io.ls(image_dir, True)
+            if use_pt_files:
+                assert "image.pt" in files
+                assert "label.pt" in files
+                assert "board_info.pt" in files
+                datapoint_path = DataPointPath(
+                    path.join(image_dir, "image.pt"),
+                    path.join(image_dir, "label.pt"),
+                    path.join(image_dir, "board_info.pt"),
+                )
+            else:
+                assert "raw_image.png" in files
+                assert "raw_label.txt" in files
+                assert "raw_board_info.yaml" in files
+
+                datapoint_path = DataPointPath(
+                    path.join(image_dir, "raw_image.png"),
+                    path.join(image_dir, "raw_label.txt"),
+                    path.join(image_dir, "raw_board_info.yaml"),
+                )
+
+            datapoint_paths.append(datapoint_path)
+
+        entire_data.append(datapoint_paths)
+
+    return entire_data
+
+
+def _get_all_datapoints_v0(base_path: str) -> List[List[DataPointPath]]:
+    data_io = AssetIO(base_path)
     directories = sorted(data_io.ls())
 
     entire_data: List[List[DataPointPath]] = []
@@ -494,7 +566,7 @@ def create_datasets_split(
         if not data_io.has_dir(directory):
             continue
 
-        files = data_io.ls(directory, only_file_name=False)
+        files = data_io.ls(directory)
         map_name_to_dict = defaultdict(dict)
         board_file = None
 
@@ -527,6 +599,14 @@ def create_datasets_split(
         if directory_data:
             entire_data.append(directory_data)
 
+    return entire_data
+
+
+def create_datasets_split(
+    cfg: DataCfg,
+) -> Tuple[List[DataPointPath], List[DataPointPath]]:
+
+    entire_data = _get_all_datapoints(cfg.base_path)
     if cfg.randomize_train_split:
         random.shuffle(entire_data)
 
@@ -551,11 +631,15 @@ def create_datasets_split(
 
     train = list(itertools.chain(*train))
     test = list(itertools.chain(*test))
-
-    train = filter_datapoints_train(train, cfg.base_path)
     return train, test
 
 
 def create_datasets(cfg: DataCfg):
     train, test = create_datasets_split(cfg)
     return load_datasets(cfg, train, test)
+
+
+# Only used by dump_dataset script. TODO(rishi): create a dataloader_original script that loads the old format and this file should only contain loading for the new format
+def get_all_datapoints(base_path: str):
+    entire_data = _get_all_datapoints(base_path)
+    return entire_data
