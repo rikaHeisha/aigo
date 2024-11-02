@@ -120,11 +120,24 @@ def _read_raw_image(data_io: AssetIO, image_path: str, board_pts: torch.Tensor):
     center_square = board_pts.mean(dim=0)
     # square_half_length will perfectly keep one dimension. If width is larger, then square_half_length will be half_height of image.
     square_half_length = torch.tensor(min(width, height) / 2).float().ceil()
+
+    # TODO(rishi): refactor this code
     if width > height:
         center_square[1] = height / 2
+
+        if center_square[0] - square_half_length <= 0.0:
+            center_square[0] = square_half_length
+        elif center_square[0] + square_half_length >= width:
+            center_square[0] = width - square_half_length
+
     else:
         assert width < height
         center_square[0] = width / 2
+
+        if center_square[1] - square_half_length <= 0.0:
+            center_square[1] = square_half_length
+        elif center_square[1] + square_half_length >= height:
+            center_square[1] = height - square_half_length
 
     all_points_are_inside = all(
         [
@@ -242,6 +255,10 @@ def load_dataset_path(data_point: RawDatasetPaths, data_io: AssetIO) -> RawDatas
     label = _read_label(data_io, data_point.label_path)
     image, board_pts = _read_raw_image(data_io, data_point.image_path, board_pts)
     image = image[:3, :, :]  # Remove the alpha channel
+
+    image_size = torch.tensor([image.shape[2], image.shape[1]])
+    board_pts = board_pts / image_size
+
     return RawDatasetPoint(image, label, board_pts)
 
 

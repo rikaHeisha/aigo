@@ -100,9 +100,11 @@ def do_main(cfg: DumpDatasetCfg):
             # plt.clf()
             # plt.imshow(image)
             # plt.scatter(
-            #     datapoint.board_pt[:, 0], datapoint.board_pt[:, 1], s=20, c="red"
+            #     datapoint.board_pt[:, 0] * image.shape[1],
+            #     datapoint.board_pt[:, 1] * image.shape[0],
+            #     s=20,
+            #     c="red",
             # )
-
             # plt.savefig("/home/rmenon/Desktop/dev/projects/aigo/rishi.png")
 
     # Done
