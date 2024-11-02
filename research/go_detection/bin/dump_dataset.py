@@ -1,34 +1,18 @@
 import logging
 import os
-import time
 from os import path
-from typing import cast
 
 import debugpy
 import hydra
-import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from go_detection.common.asset_io import AssetIO
-from go_detection.common.matplotlib_utils import draw_histogram
-from go_detection.config import DumpDatasetCfg, SimCfg
-from go_detection.dataloader import (
-    DataPoint,
-    DataPoints,
-    DistSampler,
-    NonReplacementSampler,
-    UniformSampler,
-    _load_single,
-    create_datasets,
+from go_detection.config import DumpDatasetCfg
+from go_detection.dataset.dump_dataset_loader import (
     get_all_datapoints,
+    load_dataset_path,
 )
-from go_detection.dataloader_viz import visualize_accuracy_over_num_pieces
-from go_detection.trainer import GoTrainer
 from hydra.core.config_store import ConfigStore
-from hydra.core.hydra_config import HydraConfig
 from hydra.utils import instantiate
-from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
@@ -71,7 +55,6 @@ def do_main(cfg: DumpDatasetCfg):
         "dataset_info.yaml",
         {
             "version": 1,
-            "has_pt_files": True,
         },
     )
     for board_idx, list_images in tqdm(
@@ -89,7 +72,7 @@ def do_main(cfg: DumpDatasetCfg):
                 path.join(f"board_{board_idx:03d}", f"image_{image_idx:03d}")
             )
             image_dir.mkdir()
-            datapoint = _load_single(data_point_path, AssetIO(cfg.base_path))
+            datapoint = load_dataset_path(data_point_path, AssetIO(cfg.base_path))
             # Save the pt files
             image_dir.save_torch("image.pt", datapoint.image)
             image_dir.save_torch("label.pt", datapoint.label)
