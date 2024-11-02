@@ -13,6 +13,7 @@ from go_detection.dataset.dump_dataset_loader import (
 )
 from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
+from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
@@ -92,7 +93,20 @@ def do_main(cfg: DumpDatasetCfg):
                 },
             )
 
-    print("a")
+            # image = datapoint.image.transpose(0, 1).transpose(
+            #     1, 2
+            # )  # Convert CHW to HWC
+            # image = image.clamp(0.0, 1.0)
+            # plt.clf()
+            # plt.imshow(image)
+            # plt.scatter(
+            #     datapoint.board_pt[:, 0], datapoint.board_pt[:, 1], s=20, c="red"
+            # )
+
+            # plt.savefig("/home/rmenon/Desktop/dev/projects/aigo/rishi.png")
+
+    # Done
+    print("Finished dumping dataset")
 
 
 @hydra.main(config_path="../config", config_name="dump_dataset", version_base="1.2")

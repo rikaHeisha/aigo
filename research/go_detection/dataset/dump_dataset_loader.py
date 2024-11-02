@@ -1,23 +1,15 @@
-import itertools
 import logging
-import random
-import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import IntEnum
 from os import path
-from typing import List, Tuple, cast
+from typing import List, Tuple
 
 import numpy as np
 import torch
 import torchvision.transforms as transforms
+import torchvision.transforms.functional as tvf
 from go_detection.common.asset_io import AssetIO
-from go_detection.config import DataCfg
-from matplotlib import pyplot as plt
-from PIL import Image
-from torch.utils.data import DataLoader, Dataset, Sampler
-from torchvision.transforms.functional import crop
-from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -63,21 +55,67 @@ class RawDatasetLabel(IntEnum):
             assert False, f"Unknown enum: {self}"
 
 
+def _transform_points_resize(
+    points: torch.Tensor,
+    image_size: torch.Tensor,  # width x height
+    new_image_size: torch.Tensor,  # width x height
+):
+    assert (
+        (points[:, 0] >= 0.0)
+        & (points[:, 0] <= image_size[0])
+        & (points[:, 1] >= 0.0)
+        & (points[:, 1] <= image_size[1])
+    ).all(), "Points should be inside the image"
+
+    factor = new_image_size / image_size
+
+    return points * factor
+
+
+def _transform_points_crop(
+    points: torch.Tensor,
+    image_size: torch.Tensor,  # width x height
+    crop_center: torch.Tensor,
+    half_length: torch.Tensor,
+):
+    (width, height) = image_size
+    # Check that all corners of the crop region are within the image
+    crop_corner_points = torch.stack(
+        [
+            crop_center + half_length * torch.tensor([-1, -1]),
+            crop_center + half_length * torch.tensor([1, -1]),
+            crop_center + half_length * torch.tensor([1, 1]),
+            crop_center + half_length * torch.tensor([-1, 1]),
+        ]
+    )
+    assert (
+        (crop_corner_points[:, 0] >= 0.0)
+        & (crop_corner_points[:, 0] <= width)
+        & (crop_corner_points[:, 1] >= 0.0)
+        & (crop_corner_points[:, 1] <= height)
+    ).all(), "Crop corners exceed past the image which is not good"
+
+    top_left = crop_corner_points[0]
+    new_points = points - top_left
+    return new_points
+
+
 def _read_raw_image(data_io: AssetIO, image_path: str, board_pts: torch.Tensor):
     """
     Returns tuple:
         - resized image
-        - original (width x height) before resizing
+        - board_pts after the transformation
     """
     orig_image = data_io.load_image(image_path)
     _, height, width = orig_image.shape
-    original_size = torch.tensor([width, height])
     new_size = (1024, 1024)  # Specify the new size (height, width)
 
     if width == height:
-        resize_transform = transforms.Resize(new_size)
-        resized_tensor = resize_transform(orig_image)
-        return resized_tensor, original_size
+        resized_tensor = tvf.resize(orig_image, new_size)
+        new_board_pts = _transform_points_resize(
+            board_pts, torch.tensor([width, height]), torch.tensor(new_size)
+        )
+        return resized_tensor, new_board_pts
 
     center_square = board_pts.mean(dim=0)
     # square_half_length will perfectly keep one dimension. If width is larger, then square_half_length will be half_height of image.
@@ -137,29 +175,35 @@ def _read_raw_image(data_io: AssetIO, image_path: str, board_pts: torch.Tensor):
         rectangle_half_length = torch.tensor([square_half_length, square_half_length])
 
     # Check that all the points fit inside the crop region
-    all(
+    assert all(
         [
             ((board_pts - (center_square - rectangle_half_length)) >= 0.0).all(),
             ((board_pts - (center_square + rectangle_half_length)) <= 0.0).all(),
         ]
     ), "Expected all the board points to be inside the rectangular crop region"
-    intermediate_image = crop(
+
+    intermediate_image = tvf.crop(
         orig_image,
         int(center_square[1] - rectangle_half_length[1]),
         int(center_square[0] - rectangle_half_length[0]),
         int(2 * rectangle_half_length[1]),
         int(2 * rectangle_half_length[0]),
     )
+    new_board_pts = _transform_points_crop(
+        board_pts, torch.tensor([width, height]), center_square, rectangle_half_length
+    )
 
-    resize_transform = transforms.Resize(new_size)
-    resized_image = resize_transform(intermediate_image)
+    resized_image = tvf.resize(intermediate_image, new_size)
+    new_board_pts = _transform_points_resize(
+        new_board_pts, rectangle_half_length * 2, torch.tensor(new_size)
+    )
 
     # asset_io = AssetIO("/home/rmenon/Desktop/dev/projects/aigo/research")
     # asset_io.save_image("rishi_orig.png", orig_image)
     # asset_io.save_image("rishi_intermediate.png", intermediate_image)
     # asset_io.save_image("rishi_final.png", resized_image)
 
-    return resized_image, original_size
+    return resized_image, new_board_pts
 
 
 def _read_label(data_io: AssetIO, label_path: str):
@@ -190,16 +234,14 @@ def _read_label(data_io: AssetIO, label_path: str):
 
 
 def load_dataset_path(data_point: RawDatasetPaths, data_io: AssetIO) -> RawDatasetPoint:
+    # board_pts is a list of 4 points. The first point is the top left corner, and then the points are in clockwise order
     board_pts = torch.tensor(
         data_io.load_yaml(data_point.board_path)["pts_clicks"]
     ).float()
 
     label = _read_label(data_io, data_point.label_path)
-    image, original_size = _read_raw_image(data_io, data_point.image_path, board_pts)
+    image, board_pts = _read_raw_image(data_io, data_point.image_path, board_pts)
     image = image[:3, :, :]  # Remove the alpha channel
-    # board_pts is a list of 4 points. The first point is the top left corner, and then the points are in clockwise order
-    board_pts = board_pts / original_size
-
     return RawDatasetPoint(image, label, board_pts)
 
 
