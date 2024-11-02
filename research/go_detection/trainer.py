@@ -18,8 +18,8 @@ from go_detection.dataloader import (
     DataPoint,
     DataPointPath,
     DataPoints,
+    GoBaseDataset,
     GoDataset,
-    GoDynamicDataset,
     create_datasets,
     load_datasets,
 )
@@ -348,9 +348,7 @@ class GoTrainer:
 
     def _evaluate_dataset(
         self,
-        dataset: (
-            GoDynamicDataset | GoDataset
-        ),  # TODO(rishi): change this to dataloader?
+        dataset: GoBaseDataset,  # TODO(rishi): change this to dataloader?
         evaluate_path: str,
         render_dirs: List[int],
         images_per_dir: Optional[int],
@@ -462,7 +460,7 @@ class GoTrainer:
         asset_io.mkdir("")
 
         dataset, sampler = dataloader.dataset, dataloader.sampler
-        dataset = cast(GoDynamicDataset | GoDataset, dataset)
+        dataset = cast(GoBaseDataset, dataset)
 
         total_possibilities = 19 * 19 + 1
         data = dataset.num_pieces
@@ -531,7 +529,7 @@ class GoTrainer:
         # )
         # sys.exit(0)
 
-        # dataset = cast(GoDynamicDataset | GoDataset, self.train_dataloader.dataset)
+        # dataset = cast(GoBaseDataset, self.train_dataloader.dataset)
         # for idx in range(len(dataset)):
         #     data_point = cast(DataPoint, dataset[idx])
         #     logger.info(

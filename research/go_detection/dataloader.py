@@ -188,7 +188,7 @@ def _load_num_pieces(data_io: AssetIO, datapoint_paths: List[DataPointPath]):
     return torch.stack(list_num_pieces, dim=0)
 
 
-class BaseGoDataset(Dataset):
+class GoBaseDataset(Dataset):
     def __init__(
         self,
         datapoint_paths: List[DataPointPath],
@@ -210,7 +210,7 @@ class BaseGoDataset(Dataset):
         raise NotImplementedError("Base class does not implement this")
 
 
-class GoDataset(BaseGoDataset):
+class GoDataset(GoBaseDataset):
     def __init__(
         self,
         datapoint_paths: List[DataPointPath],
@@ -229,7 +229,7 @@ class GoDataset(BaseGoDataset):
         return data_point
 
 
-class GoDynamicDataset(BaseGoDataset):
+class GoDynamicDataset(GoBaseDataset):
     """
     We cannot load the entire dataset into memory so load it dynamically
     """
@@ -246,7 +246,7 @@ class GoDynamicDataset(BaseGoDataset):
         return data_point
 
 
-def _create_sampler(sampler_type: str, dataset: GoDataset | GoDynamicDataset):
+def _create_sampler(sampler_type: str, dataset: GoBaseDataset):
     assert sampler_type in [
         "non_replacement",
         "uniform",
