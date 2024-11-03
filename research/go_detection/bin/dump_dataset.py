@@ -64,6 +64,11 @@ def do_main(cfg: DumpDatasetCfg):
         total=len(all_datapoint_paths),
         colour="red",
     ):
+        # if board_idx != 12:
+        #     continue
+
+        # a = 1
+
         for image_idx, data_point_path in tqdm(
             enumerate(list_images),
             desc=f"Dumping board {board_idx:02d}",

@@ -173,7 +173,21 @@ def _read_raw_image(data_io: AssetIO, image_path: str, board_pts: torch.Tensor):
 
         elif load_mode == 1:
             # In this mode, we do not want any black padding at all. This mode starts with the best fit square, and expands it in ONE dimension till it fits all the points. Then we can furthur expand it using extra_expand parameter. A higher value will increase the amount of background info in the image. Once we crop the rectangular region, it gets resized to a square, so this mode does not preserve the aspect ratio
+
             extra_expand = 60
+            if width > height:
+                possible_expand = min(
+                    width - (center_square[0] + required_half_length),
+                    center_square[0] - required_half_length,
+                )
+            else:
+                possible_expand = min(
+                    height - (center_square[1] + required_half_length),
+                    center_square[1] - required_half_length,
+                )
+
+            extra_expand = min(extra_expand, possible_expand)
+
             rectangle_half_length = (
                 [required_half_length + extra_expand, square_half_length]
                 if width > height
