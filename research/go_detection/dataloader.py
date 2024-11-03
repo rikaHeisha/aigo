@@ -13,7 +13,6 @@ import torch
 import torchvision.transforms as transforms
 from go_detection.common.asset_io import AssetIO
 from go_detection.config import DataCfg
-from matplotlib import pyplot as plt
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchvision.transforms.functional import crop

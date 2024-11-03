@@ -4,6 +4,8 @@ import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
 
+plt.ioff()
+
 
 def intensity_to_rgb(intensity: np.ndarray, color_map: str = "plasma") -> np.ndarray:
     if not np.all((intensity >= 0.0) & (intensity <= 1.0)):

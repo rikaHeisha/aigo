@@ -31,13 +31,14 @@ from hydra.utils import instantiate
 from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
 
+plt.ioff()
+
 logger = logging.getLogger(__name__)
 
 
 def do_main(cfg: SimCfg):
     train, test = create_datasets(cfg.data_cfg)
     train_dataset, test_dataset = train.dataset, test.dataset
-    train_iter = iter(train_dataset)
 
     for idx in range(10):
         data_point = cast(DataPoint, train_dataset[idx])

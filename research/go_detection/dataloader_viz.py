@@ -6,6 +6,8 @@ import torch
 from go_detection.dataloader import DataPoint, DataPoints
 from matplotlib import pyplot as plt
 
+plt.ioff()
+
 
 def _label_to_color(lab):
     if lab == 0:
