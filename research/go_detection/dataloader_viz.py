@@ -25,10 +25,9 @@ def _draw_board(axis, board_grid_pt, grid_dim):
 
     colors = _label_to_color(1)
 
-    # Our origin is top left corner of the image / board. But matplotlib uses bottom left corner as origin. Hence we need to do (grid_height - 1) to convert the y value from our origin to matplotlib's origin
     axis.scatter(
         (board_grid_pt[:, 0]),
-        (grid_height - 1) - (board_grid_pt[:, 1]),
+        board_grid_pt[:, 1],
         facecolors=colors,
         # edgecolors="#606060",
         # c=colors,
@@ -47,11 +46,10 @@ def _draw_pieces(axis, grid_pt, label, grid_dim):
     pieces_label = label[mask]
     assert (pieces_label != 1).all()
 
-    # Our origin is top left corner of the image / board. But matplotlib uses bottom left corner as origin. Hence we need to do (grid_height - 1) to convert the y value from our origin to matplotlib's origin
     pieces_colors = [_label_to_color(l) for l in pieces_label]
     axis.scatter(
         (pieces_grid_pt[:, 0]).int(),
-        (grid_height - 1) - (pieces_grid_pt[:, 1]).int(),
+        (pieces_grid_pt[:, 1]).int(),
         facecolors=pieces_colors,
         # edgecolors="#606060",
         # c=colors,
@@ -64,10 +62,9 @@ def _draw_correct_incorrect(axis, grid_pt, label, predicted_label, grid_dim):
     (grid_height, grid_width) = grid_dim
     colors = [("green" if l else "red") for l in (predicted_label == label).reshape(-1)]
 
-    # Our origin is top left corner of the image / board. But matplotlib uses bottom left corner as origin. Hence we need to do (grid_height - 1) to convert the y value from our origin to matplotlib's origin
     axis.scatter(
         (grid_pt[:, 0]).int(),
-        (grid_height - 1) - (grid_pt[:, 1]).int(),
+        (grid_pt[:, 1]).int(),
         facecolors=colors,
         # edgecolors="red",
         # c=colors,
@@ -81,9 +78,18 @@ def visualize_grid(
     output_path: str,
     index: int,
     predicted_label: torch.Tensor,
+    image_ovelay_points: torch.Tensor | None,
 ):
+    """Draw an image of a single board along with predicted outputs
+
+    predicted_label: Shape should be 19 x 19
+    image_ovelay_points: Normalized points (between 0 and 1). The origin of the image and the points is top left. Shape should be N x 2
+
+    """
     data_points = data_points.cpu()
     predicted_label = predicted_label.cpu()
+    if image_ovelay_points is not None:
+        image_ovelay_points = image_ovelay_points.cpu()
 
     (num_images, _, height, width) = data_points.images.shape
     assert index < num_images
@@ -118,8 +124,18 @@ def visualize_grid(
     image = image.transpose(0, 1).transpose(1, 2)  # Convert CHW to HWC
     image = image.clamp(0.0, 1.0)
 
+    # Draw the original image
     axes[0].imshow(image)
-    # _draw_board(axes[0], board_grid_pt)
+    if image_ovelay_points is not None:
+        image_ovelay_points = image_ovelay_points * torch.tensor([width, height])
+        # image_ovelay_points = torch.tensor([[20, 20], [60, 20]])
+        axes[0].scatter(
+            image_ovelay_points[:, 0],
+            image_ovelay_points[:, 1],
+            s=4000,
+            c="red",
+            marker="o",
+        )
 
     _draw_board(axes[1], board_grid_pt, grid_dim)
     _draw_pieces(axes[1], grid_pt, label, grid_dim)
@@ -133,9 +149,9 @@ def visualize_grid(
     axes[0].axis("off")
     axes[0].set_aspect("equal")
     axes[0].set_xlim(0, width)
-    axes[0].set_ylim(
-        height,
-    )
+    axes[0].set_ylim(height, 0)
+    # axes[0].set_ylim(0, height)
+    # axes[0].set_ylim(height)
 
     # axes[0].set_facecolor("#222222")
     # axes[0].set_aspect("equal")
@@ -154,7 +170,7 @@ def visualize_grid(
         axis.set_facecolor("#515151")
         axis.set_aspect("equal")
         axis.set_xlim(-0.5, 18.5)
-        axis.set_ylim(-0.5, 18.5)
+        axis.set_ylim(18.5, -0.5)
 
         axis.xaxis.set_visible(False)  # Hide x-axis
         axis.yaxis.set_visible(False)  # Hide y-axis

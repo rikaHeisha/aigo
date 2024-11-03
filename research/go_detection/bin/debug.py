@@ -6,6 +6,7 @@ from typing import cast
 import debugpy
 import hydra
 import numpy as np
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from go_detection.common.asset_io import AssetIO
@@ -19,7 +20,10 @@ from go_detection.dataloader import (
     UniformSampler,
     create_datasets,
 )
-from go_detection.dataloader_viz import visualize_accuracy_over_num_pieces
+from go_detection.dataloader_viz import (
+    visualize_accuracy_over_num_pieces,
+    visualize_grid,
+)
 from go_detection.trainer import GoTrainer
 from hydra.core.config_store import ConfigStore
 from hydra.core.hydra_config import HydraConfig
@@ -33,6 +37,26 @@ logger = logging.getLogger(__name__)
 def do_main(cfg: SimCfg):
     train, test = create_datasets(cfg.data_cfg)
     train_dataset, test_dataset = train.dataset, test.dataset
+    train_iter = iter(train_dataset)
+
+    for idx in range(10):
+        data_point = cast(DataPoint, train_dataset[idx])
+        data_points = data_point.to_data_points().cuda()
+
+        fake_points = data_points.board_pts[0]
+        # predicted_label = data_points.labels[0]
+        predicted_label = torch.ones(19, 19)
+        predicted_label[0] = torch.zeros(19)
+
+        visualize_grid(
+            data_points,
+            "/home/rmenon/Desktop/dev/projects/aigo/research/rishi.png",
+            0,
+            predicted_label=predicted_label,
+            image_ovelay_points=fake_points,
+        )
+
+        a = 1
 
     # base_path = (
     #     "/home/rmenon/Desktop/dev/ml_results/aigo_results/go2_basic_adam_1016/results/"
