@@ -64,9 +64,8 @@ def do_main(cfg: DumpDatasetCfg):
         total=len(all_datapoint_paths),
         colour="red",
     ):
-        # if board_idx != 12:
+        # if board_idx != 46:
         #     continue
-
         # a = 1
 
         for image_idx, data_point_path in tqdm(
@@ -110,7 +109,10 @@ def do_main(cfg: DumpDatasetCfg):
             #     s=20,
             #     c="red",
             # )
-            # plt.savefig("/home/rmenon/Desktop/dev/projects/aigo/rishi.png")
+            # plt.savefig(
+            #     f"/home/rmenon/Desktop/dev/ml_results/aigo_results/temp_res/{board_idx}_{image_idx}.png"
+            # )
+            # a = 1
 
     # Done
     print("Finished dumping dataset")
