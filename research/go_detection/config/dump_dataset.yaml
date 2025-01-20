@@ -4,5 +4,6 @@ defaults:
   - _self_
 
 
-base_path: /home/rmenon/Desktop/dev/datasets/go_board/dataset
-output_path: /home/rmenon/Desktop/dev/datasets/go_board/dataset_dumped
+
+base_path: /home/rishi/Desktop/dev/ml/datasets/go_board/dataset
+output_path: /home/rishi/Desktop/dev/ml/datasets/go_board/dataset_dumped

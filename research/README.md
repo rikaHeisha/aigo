@@ -2,12 +2,34 @@
 ## Training a model
 
 ### Setup
-First download all pip packages:
+First install Anaconda
+#### Installing pytorch
+```
+See: https://medium.com/@jeanpierre_lv/installing-pytorch-with-gpu-support-on-ubuntu-a-step-by-step-guide-38dcf3f8f266
+and https://pytorch.org/get-started/locally/
+
+sudo apt install nvidia-driver-550
+
+conda install -c nvidia cuda-nvcc
+conda install -c "nvidia/label/cuda-11.3.0" cuda-nvcc
+
+nvcc --version
+
+conda install -c anaconda cudatoolkit
+
+
+
+conda install pytorch torchvision torchaudio pytorch-cuda=12.4 -c pytorch -c nvidia
+
+```
+
+#### Installing other packages
+Download all pip packages:
 ```
 pip install hydra-core --upgrade
-pip install fire matplotlib plotly kaleido snakeviz
+pip install fire matplotlib plotly kaleido snakeviz open3d colorlog
 
-pip install torch numpy
+pip install torch numpy tensorboard
 pip install ai_edge_torch
 
 ```

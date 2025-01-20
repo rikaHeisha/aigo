@@ -11,7 +11,7 @@ i_print: 1
 i_tf_writer: 20
 
 data_cfg:
-  base_path: /home/rmenon/Desktop/dev/datasets/go_board/dataset_dumped
+  base_path: /home/rishi/Desktop/dev/ml/datasets/go_board/dataset_dumped
   train_split_percent: 0.9
   randomize_train_split: True
   use_dynamic_dataset: True
@@ -28,7 +28,7 @@ loss_cfg:
   # order: black, empty, white
   nll_loss_weights: [1, 0, 1]
 result_cfg:
-  dir: /home/rmenon/Desktop/dev/ml_results/aigo_results
+  dir: /home/rishi/Desktop/dev/ml/ml_results/aigo_results
   eval_cfg:
     render_grid: True
 
